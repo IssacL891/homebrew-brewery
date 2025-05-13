@@ -12,7 +12,7 @@ jobs:
     steps:
     - uses: macauley/action-homebrew-bump-cask@v1
       with:
-        token: ${{secrets.GITHUB_TOKEN}}
+        token: ${{secrets.CASK_BUMPER}}
         tap:  IssacL891/homebrew-brewery
         livecheck: true
         dryrun: true
