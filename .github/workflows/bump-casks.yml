@@ -16,4 +16,4 @@ jobs:
         tap:  IssacL891/homebrew-brewery
         cask: mangayomi
         livecheck: true
-        dryrun: true
+        dryrun: false
