@@ -1,7 +1,6 @@
 cask "mangayomi" do
-  version "0.6.2"
-  sha256 "e9ee1564fe5c48e9af00223c0a98492c6550d77c35919b64bff1c6bab284e58e"
-
+  version "0.6.25"
+  sha256 "7e0d5af5eda75d23e8d51d1b7e63b4d966d5693ada7de108089dc3963ae56a1d"
   url "https://github.com/kodjodevf/mangayomi/releases/download/v#{version}/Mangayomi-v#{version}-macos.dmg"
   name "mangayomi"
   desc "Free and open source application for reading manga, novels, and watching anime"
