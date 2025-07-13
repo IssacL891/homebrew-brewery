@@ -18,3 +18,4 @@ jobs:
             token: ${{ secrets.BUMP_CASK_TOKEN }}
             tap:  IssacL891/homebrew-brewery
             cask: mangayomi
+            livecheck: true
