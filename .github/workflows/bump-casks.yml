@@ -1,19 +1,20 @@
 name: bump-casks
 on:
+  workflow_dispatch:                      # allow manual trigger
+  push:
+    tags:
+      - '*'
   schedule:
     # Time is UTC, so below is running everyday at 8AM and 8PM PST
     - cron:  '0 4,16 * * *'
-  # Allows you to run this workflow manually from the Actions tab
-  workflow_dispatch:
 
 jobs:
   bump-casks:
     runs-on: macos-latest
     steps:
-    - uses: eugenesvk/action-homebrew-bump-cask@3.8.4
-      with:
-        token: ${{ secrets.BUMP_CASK_TOKEN }}
-        tap:  IssacL891/homebrew-brewery
-        cask: mangayomi
-        livecheck: true
-        dryrun: false
+        - name: Bump Homebrew Cask
+          uses: eugenesvk/action-homebrew-bump-cask@3.8.4
+          with:
+            token: ${{ secrets.BUMP_CASK_TOKEN }}
+            tap:  IssacL891/homebrew-brewery
+            cask: mangayomi
