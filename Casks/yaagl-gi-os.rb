@@ -14,7 +14,7 @@ cask "yaagl-gi-os" do
 
   app "Yaagl OS.app"
 
-    zap trash: [
+  zap trash: [
     "~/Library/Application Support/Yaagl OS"
 ]
 end
