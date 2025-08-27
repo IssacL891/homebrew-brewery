@@ -1,4 +1,4 @@
-cask "yaggl-gi" do
+cask "yaagl-gi" do
   version "0.2.26"
   sha256 "6a4117a8dbdae6a377ece0a2f493d9b544b7a9f32833e57a65f99734d1b2b8c4"
 
