@@ -1,10 +1,10 @@
 cask "yaagl-gi-os" do
-  version "0.2.26"
-  sha256 "9bd3221ac1ee9ed7017643dce4a5cbe6e4ea55186d84ee0661dec3e2632af9b1"
+  version "0.2.27"
+  sha256 "3f622a32c8608c30cf3757e45c79640fe1dd4ef407b00048e5d5b19b3283d7e9"
 
   url "https://github.com/yaagl/yet-another-anime-game-launcher/releases/download/#{version}/Yaagl.OS.app.tar.gz"
   name "Yet Another Anime Game Launcher"
-  desc "A launcher for an anime game overseas"
+  desc "Launcher for an anime game overseas"
   homepage "https://github.com/yaagl/yet-another-anime-game-launcher"
 
   livecheck do
@@ -16,7 +16,5 @@ cask "yaagl-gi-os" do
 
   app "Yaagl OS.app"
 
-  zap trash: [
-    "~/Library/Application Support/Yaagl OS"
-]
+  zap trash: "~/Library/Application Support/Yaagl OS"
 end
