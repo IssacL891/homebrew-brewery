@@ -1,10 +1,10 @@
 cask "yaagl-hsr" do
-  version "0.2.26"
-  sha256 "1b3f14ebd7683eff934a4dd38c46ba6f6c9b0298c8282379a0473a6c3c956f78"
+  version "0.2.27"
+  sha256 "567848bbfda3ba1fcc270f409987c86451c0e5922d9993b721479d01009e0c4b"
 
   url "https://github.com/yaagl/yet-another-anime-game-launcher/releases/download/#{version}/Yaagl.HSR.app.tar.gz"
   name "Yet Another Anime Game Launcher"
-  desc "A launcher for an anime game"
+  desc "Launcher for an anime game"
   homepage "https://github.com/yaagl/yet-another-anime-game-launcher"
 
   livecheck do
@@ -16,7 +16,5 @@ cask "yaagl-hsr" do
 
   app "Yaagl HSR.app"
 
-  zap trash: [
-    "~/Library/Application Support/Yaagl HSR"
-]
+  zap trash: "~/Library/Application Support/Yaagl HSR"
 end
