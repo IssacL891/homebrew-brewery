@@ -13,9 +13,9 @@ jobs:
     runs-on: macos-latest
     steps:
         - name: Bump Homebrew Cask
-          uses: IssacL891/action-homebrew-bump-cask@3.8.7
+          uses: eugenesvk/action-homebrew-bump-cask@3.8.5
           with:
             token: ${{ secrets.BUMP_CASK_TOKEN }}
             tap:  IssacL891/homebrew-brewery
-            cask: mangayomi
+            cask: mangayomi, yaggl-gi-os, yaggl-gi, yaggl-hsr-os, yaggl-hsr, yaggl-zzz-os, yaagl-zzz
             livecheck: true
