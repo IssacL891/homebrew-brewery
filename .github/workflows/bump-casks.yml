@@ -16,6 +16,6 @@ jobs:
           uses: IssacL891/action-homebrew-bump-cask@master
           with:
             token: ${{ secrets.BUMP_CASK_TOKEN }}
-            tap:  IssacL891/homebrew-brewery
-            cask: mangayomi
+            tap:   issacl891/brewery
+            cask: mangayomi, yaagl-gi-os, yaagl-gi, yaagl-hsr-os, yaagl-hsr, yaagl-zzz-os, yaagl-zzz
             livecheck: true
