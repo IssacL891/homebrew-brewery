@@ -13,7 +13,7 @@ jobs:
     runs-on: macos-15
     steps:
         - name: Bump Homebrew Cask
-          uses: eugenesvk/action-homebrew-bump-cask@3.8.5
+          uses: eugenesvk/action-homebrew-bump-cask@e5bf5e8719d7781fba43250cc035e274fdd72e04
           with:
             token: ${{ secrets.BUMP_CASK_TOKEN }}
             tap:  IssacL891/homebrew-brewery
