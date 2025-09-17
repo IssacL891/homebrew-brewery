@@ -17,5 +17,5 @@ jobs:
           with:
             token: ${{ secrets.BUMP_CASK_TOKEN }}
             tap:   issacl891/brewery
-            cask: mangayomi, yaagl-gi-os, yaagl-gi, yaagl-hsr-os, yaagl-hsr, yaagl-zzz-os, yaagl-zzz
+            cask: mangayomi, yaagl-gi-os, yaagl-gi, yaagl-hsr-os, yaagl-hsr, yaagl-zzz-os, yaagl-zzz, anymex, dartotsu
             livecheck: true
