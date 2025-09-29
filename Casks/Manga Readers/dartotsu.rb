@@ -8,7 +8,7 @@ cask "dartotsu" do
 
   livecheck do
     url :url
-    strategy :github_latest
+    strategy :git
   end
 
   app "Dartotsu.app"
