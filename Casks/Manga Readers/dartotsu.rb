@@ -1,5 +1,5 @@
 cask "dartotsu" do
-  version "v0.0.3"
+  version "0.0.3"
   sha256 "60e438d5b516836d37dd62a4fef1b7d2569d244dbe58ce222472d0da8c639205"
   url "https://github.com/aayush2622/Dartotsu/releases/download/v#{version}/Dartotsu-macos-v#{version}.dmg"
   name "Dartotsu"
