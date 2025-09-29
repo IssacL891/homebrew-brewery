@@ -9,7 +9,7 @@ cask "mangayomi" do
 
   livecheck do
     url :url
-    strategy :github_latest
+    strategy :git
   end
 
   app "Mangayomi.app"

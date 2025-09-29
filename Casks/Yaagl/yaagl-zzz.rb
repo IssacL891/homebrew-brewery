@@ -9,7 +9,7 @@ cask "yaagl-zzz" do
 
   livecheck do
     url :url
-    strategy :github_latest
+    strategy :git
   end
 
   depends_on macos: ">= :high_sierra"
