@@ -9,7 +9,7 @@ cask "anymex" do
 
   livecheck do
     url :url
-    strategy :git
+    strategy :github_latest
   end
 
   app "AnymeX.app"
