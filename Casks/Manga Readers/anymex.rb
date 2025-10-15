@@ -4,7 +4,7 @@ cask "anymex" do
 
   url "https://github.com/RyanYuuki/AnymeX/releases/download/v#{version}/AnymeX.dmg"
   name "AnymeX"
-  desc "AnymeX is a multiservice tracking client designed exclusively for managing and tracking anime and manga progress across AniList, MyAnimeList, and Simkl."
+  desc "A multiservice tracking client for anime and managa progress"
   homepage "https://github.com/RyanYuuki/AnymeX"
 
   livecheck do
