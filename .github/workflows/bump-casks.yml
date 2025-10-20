@@ -19,3 +19,4 @@ jobs:
             tap:   issacl891/brewery
             cask: mangayomi, yaagl-gi-os, yaagl-gi, yaagl-hsr-os, yaagl-hsr, yaagl-zzz-os, yaagl-zzz, anymex, dartotsu
             livecheck: true
+            user_name: Homebrew Cask Bump Bot
