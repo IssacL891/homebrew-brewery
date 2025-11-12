@@ -1,5 +1,7 @@
 name: Auto approve
-on: pull_request_target
+on:
+  workflow_dispatch:                      # allow manual trigger
+  pull_request_target:
 
 jobs:
   build:
