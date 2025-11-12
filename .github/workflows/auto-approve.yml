@@ -10,3 +10,6 @@ jobs:
       pull-requests: write
     steps:
       - uses: hmarr/auto-approve-action@v4
+      - uses: alexwilson/enable-github-automerge-action@main
+        with:
+              github-token: "${{ secrets.GITHUB_TOKEN }}"
