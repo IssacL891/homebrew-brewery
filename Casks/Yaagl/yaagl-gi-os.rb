@@ -1,6 +1,6 @@
 cask "yaagl-gi-os" do
-  version "0.3.2"
-  sha256 "f0bd6dd306531d55a3498998060790470add05c3611a9390611fafc5696160d0"
+  version "0.3.3"
+  sha256 "ce0a074b1a7f9368cd3990418ed99c79a24f3fe665e5bbd276ae1f92becee266"
 
   url "https://github.com/yaagl/yet-another-anime-game-launcher/releases/download/#{version}/Yaagl.OS.app.tar.gz"
   name "Yet Another Anime Game Launcher"
