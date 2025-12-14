@@ -1,9 +1,10 @@
 cask "dartotsu" do
-  version "0.0.3"
-  sha256 "60e438d5b516836d37dd62a4fef1b7d2569d244dbe58ce222472d0da8c639205"
+  version "0.0.4"
+  sha256 "67e107210ac5af20c7342b77d3950271a3b95b14c0f6e7037d77ed0a179cb31a"
+
   url "https://github.com/aayush2622/Dartotsu/releases/download/v#{version}/Dartotsu-macos-v#{version}.dmg"
   name "Dartotsu"
-  desc "A complete rewrite of Dantotsu in Flutter"
+  desc "Complete rewrite of Dantotsu in Flutter"
   homepage "https://github.com/aayush2622/Dartotsu"
 
   livecheck do
