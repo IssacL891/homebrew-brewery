@@ -1,6 +1,6 @@
 cask "yaagl-hsr" do
-  version "0.3.8"
-  sha256 "78c7d9fef4020760461b21065b3ca7f8fce78250a78453849db15b20bf37530f"
+  version "0.3.10"
+  sha256 "6d0a8e5b5ce09da1c73441999a0c031f1022a01452edea5ce138038810ebd15d"
 
   url "https://github.com/yaagl/yet-another-anime-game-launcher/releases/download/#{version}/Yaagl.HSR.app.tar.gz"
   name "Yet Another Anime Game Launcher"
