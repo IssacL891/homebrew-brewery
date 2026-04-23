@@ -1,6 +1,6 @@
 cask "anymex" do
-  version "3.0.6"
-  sha256 "a87b86952767eede0a32c2688e1ad788f65d2fc763db9cc03b666959848c82f0"
+  version "3.0.7"
+  sha256 "e4fb4fc9fb9404f575b2477c59bd07ef3121c7b46ac4d1e942a1392c9739f90e"
 
   url "https://github.com/RyanYuuki/AnymeX/releases/download/v#{version}/AnymeX.dmg"
   name "AnymeX"
