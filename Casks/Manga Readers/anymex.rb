@@ -1,6 +1,6 @@
 cask "anymex" do
-  version "3.0.7"
-  sha256 "e4fb4fc9fb9404f575b2477c59bd07ef3121c7b46ac4d1e942a1392c9739f90e"
+  version "3.0.9"
+  sha256 "933c42c4317651941739263e90d3b69bd9b939a0faa894082dacd5d72f6b6735"
 
   url "https://github.com/RyanYuuki/AnymeX/releases/download/v#{version}/AnymeX.dmg"
   name "AnymeX"
@@ -11,6 +11,8 @@ cask "anymex" do
     url :url
     strategy :github_latest
   end
+
+  depends_on :macos
 
   app "AnymeX.app"
 end
