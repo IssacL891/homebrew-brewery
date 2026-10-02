@@ -1,6 +1,6 @@
 cask "yaagl-zzz-os" do
-  version "0.3.18"
-  sha256 "192f3adc54715bdef0b95e881ea73a0ba00636e1b2704d00f34a380086bb2617"
+  version "0.3.20"
+  sha256 "0c129adbe7b199ef4105afd80402810b87125d004dd2f15aade45e233274ae68"
 
   url "https://github.com/yaagl/yet-another-anime-game-launcher/releases/download/#{version}/Yaagl.ZZZ.OS.app.tar.gz"
   name "Yet Another Anime Game Launcher"
@@ -12,7 +12,7 @@ cask "yaagl-zzz-os" do
     strategy :git
   end
 
-  depends_on macos: :big_sur
+  depends_on :macos
 
   app "Yaagl ZZZ OS.app"
 
