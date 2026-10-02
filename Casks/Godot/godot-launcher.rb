@@ -4,13 +4,15 @@ cask "godot-launcher" do
 
   url "https://github.com/godotlauncher/launcher/releases/download/v#{version}/Godot_Launcher-#{version}-mac_universal.dmg"
   name "godot-launcher"
-  desc "A streamlined, open-source tool designed to simplify and accelerate your Godot game development workflow"
+  desc "Open-source launcher for Godot game development"
   homepage "https://github.com/godotlauncher/launcher"
 
   livecheck do
     url :url
     strategy :github_latest
   end
+
+  depends_on :macos
 
   app "Godot Launcher.app"
 end
