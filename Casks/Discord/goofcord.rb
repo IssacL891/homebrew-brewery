@@ -1,17 +1,20 @@
 cask "goofcord" do
-  version "1.11.0"
-  sha256 "4b8b7fdd91a44113b0733f6467d5a47f1958b7c671c117e264b0449a619857a2"
+  version "2.3.1"
+  sha256 "4f333711ff5e836bea2fd944e455a25e66b8abcb6df74c73b7de5177e71f57dd"
+
   url "https://github.com/Milkshiift/GoofCord/releases/download/v#{version}/GoofCord-#{version}-mac-arm64.dmg"
   name "Goofcord"
-  desc "A modified version of Discord with privacy enhancements"
+  desc "Modified version of Discord with privacy enhancements"
   homepage "https://github.com/Milkshiift/GoofCord"
+
   livecheck do
     url :url
     strategy :git
   end
 
-  depends_on macos: ">= :big_sur"
+  depends_on :macos
 
   app "Goofcord.app"
+
   zap trash: "~/Library/Application Support/Goofcord"
 end
