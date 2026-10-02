@@ -1,6 +1,6 @@
 cask "yaagl-hsr-os" do
-  version "0.3.17"
-  sha256 "b2ce09350ddde03c4b90f7777152aa75bdb7cde2e72e17840d9df35c979e10db"
+  version "0.3.20"
+  sha256 "e215c9c3d2f22ace2db3371d35a0be27ef7cf0684a251d44b34e3522d663373b"
 
   url "https://github.com/yaagl/yet-another-anime-game-launcher/releases/download/#{version}/Yaagl.HSR.OS.app.tar.gz"
   name "Yet Another Anime Game Launcher"
@@ -12,7 +12,7 @@ cask "yaagl-hsr-os" do
     strategy :git
   end
 
-  depends_on macos: :big_sur
+  depends_on :macos
 
   app "Yaagl HSR OS.app"
 
