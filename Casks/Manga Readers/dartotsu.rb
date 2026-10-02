@@ -1,6 +1,6 @@
 cask "dartotsu" do
-  version "0.0.4"
-  sha256 "67e107210ac5af20c7342b77d3950271a3b95b14c0f6e7037d77ed0a179cb31a"
+  version "1.0.0"
+  sha256 "6da82a5767db52da522d18260b87e887b3516ce9d8a9266c7b7b89f484fb22fa"
 
   url "https://github.com/aayush2622/Dartotsu/releases/download/v#{version}/Dartotsu-macos-v#{version}.dmg"
   name "Dartotsu"
@@ -11,6 +11,8 @@ cask "dartotsu" do
     url :url
     strategy :git
   end
+
+  depends_on :macos
 
   app "Dartotsu.app"
 end
