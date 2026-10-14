@@ -1,6 +1,6 @@
 cask "godot-launcher" do
-  version "1.12.0"
-  sha256 "580be3b588b55295ade6c4af3a8a4f9fc090ee56ebd6ca7576990fdbadd59349"
+  version "1.13.0"
+  sha256 "ef3c5cd24cc9d5c9bddcad057e456dd4f1a494ecdf183402d5ad79ddcfcb158b"
 
   url "https://github.com/godotlauncher/launcher/releases/download/v#{version}/Godot_Launcher-#{version}-mac_universal.dmg"
   name "godot-launcher"
