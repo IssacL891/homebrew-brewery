@@ -1,6 +1,6 @@
 cask "grimoire" do
-  version "1.32.0"
-  sha256 "44eed9c53927fa0554047a12583eaf475e23345137ba4b2ae0fc80f2086e3be9"
+  version "1.33.0"
+  sha256 "eccb980708827a07a3bdaadcb76ce2c8a821a51f149ef4422d2c5eae59480305"
 
   url "https://github.com/Slush97/grimoire/releases/download/v#{version}/Grimoire-#{version}-arm64.dmg"
   name "Grimoire"
