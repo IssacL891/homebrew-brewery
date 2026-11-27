@@ -2,9 +2,9 @@ name: Brewery package validation
 
 on:
   pull_request:
-    branches: [main]
+    branches: [brewery/upstream-app-smoke]
   push:
-    branches: [main]
+    branches: [brewery/upstream-app-smoke]
   workflow_dispatch:
 
 permissions:

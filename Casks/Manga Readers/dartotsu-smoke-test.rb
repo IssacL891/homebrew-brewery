@@ -1,6 +1,6 @@
-# Generated from packages/casks/Manga Readers/dartotsu.yaml. Edit the YAML and regenerate.
+# Generated from packages/casks/Manga Readers/dartotsu-smoke-test.yaml. Edit the YAML and regenerate.
 
-cask "dartotsu" do
+cask "dartotsu-smoke-test" do
   version "1.0.0"
   sha256 "6da82a5767db52da522d18260b87e887b3516ce9d8a9266c7b7b89f484fb22fa"
 

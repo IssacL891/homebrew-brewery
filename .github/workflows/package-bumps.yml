@@ -1,23 +1,14 @@
-name: Brewery package bumps
+name: Brewery App smoke test
 
 on:
-  schedule:
-    - cron: "0 4,16 * * *"
-  workflow_dispatch:
-    inputs:
-      package:
-        description: "Optional package, for example cask:dartotsu"
-        type: string
-      publish:
-        description: "Open and queue bump PRs after cutover"
-        type: boolean
-        default: false
+  push:
+    branches: [brewery/upstream-app-run]
 
 permissions:
   contents: read
 
 concurrency:
-  group: brewery-package-bumps
+  group: brewery-app-smoke
   cancel-in-progress: false
 
 env:
@@ -34,6 +25,7 @@ jobs:
         if: ${{ !env.ACT }}
         uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
         with:
+          ref: brewery/upstream-app-smoke
           persist-credentials: false
 
       - name: Set up Python
@@ -46,9 +38,9 @@ jobs:
         if: ${{ !env.ACT }}
         env:
           GH_TOKEN: ${{ github.token }}
-          PACKAGE: ${{ inputs.package }}
+          PACKAGE: cask:dartotsu-smoke-test
           BREWERY_APP_BOT: ${{ vars.BREWERY_APP_BOT }}
-          STAGE_BINARIES: ${{ github.ref == 'refs/heads/main' && vars.BREWERY_PUBLISH_ENABLED == 'true' && (github.event_name == 'schedule' || inputs.publish) }}
+          STAGE_BINARIES: "false"
           TAP: ${{ github.repository_owner }}/brewery
         run: |
           python -m pip install -r automation/requirements.txt
@@ -81,7 +73,7 @@ jobs:
 
   publish:
     needs: scan
-    if: ${{ github.ref == 'refs/heads/main' && vars.BREWERY_PUBLISH_ENABLED == 'true' && (github.event_name == 'schedule' || inputs.publish) }}
+    if: ${{ github.ref == 'refs/heads/brewery/upstream-app-run' }}
     runs-on: macos-latest
     timeout-minutes: 20
     steps:
@@ -90,6 +82,7 @@ jobs:
         uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
         with:
           fetch-depth: 0
+          ref: brewery/upstream-app-smoke
           persist-credentials: false
 
       - name: Set up Python
@@ -150,7 +143,7 @@ jobs:
 
   report:
     needs: [scan, publish]
-    if: ${{ always() && github.ref == 'refs/heads/main' && github.event_name == 'schedule' && vars.BREWERY_ISSUE_NUMBER != '' && vars.BREWERY_APP_CLIENT_ID != '' }}
+    if: ${{ always() && github.ref == 'refs/heads/brewery/upstream-app-run' && vars.BREWERY_ISSUE_NUMBER != '' && vars.BREWERY_APP_CLIENT_ID != '' }}
     runs-on: macos-latest
     timeout-minutes: 10
     steps:
@@ -158,6 +151,7 @@ jobs:
         if: ${{ !env.ACT }}
         uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
         with:
+          ref: brewery/upstream-app-smoke
           persist-credentials: false
 
       - name: Set up Python
@@ -205,8 +199,17 @@ jobs:
         run: |
           test -n "$APP_SLUG"
           test "$BREWERY_APP_BOT" = "${APP_SLUG}[bot]"
-          python automation/notifications.py --scan "$RUNNER_TEMP/brewery/brewery-scan.json" \
-            --publish "$RUNNER_TEMP/brewery/brewery-publish.json"
+          smoke_scan="$RUNNER_TEMP/brewery/smoke-notification.json"
+          cat > "$smoke_scan" <<'JSON'
+          {"packages":[{"kind":"cask","token":"dartotsu-smoke-test","status":"warning","message":"smoke test fixture"}]}
+          JSON
+          export SCAN_STATUS=success PUBLISH_STATUS=skipped
+          python automation/notifications.py --scan "$smoke_scan" --publish /dev/null
+          python automation/notifications.py --scan "$smoke_scan" --publish /dev/null
+          cat > "$smoke_scan" <<'JSON'
+          {"packages":[{"kind":"cask","token":"dartotsu-smoke-test","status":"current","message":"smoke test fixture cleared"}]}
+          JSON
+          python automation/notifications.py --scan "$smoke_scan" --publish /dev/null
 
       - name: Exercise local issue transitions
         if: ${{ env.ACT }}

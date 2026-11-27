@@ -124,7 +124,7 @@ mutation($input: CreateCommitOnBranchInput!) {
 
 
 class GitHub:
-    default_branch = "main"
+    default_branch = "brewery/upstream-app-smoke"
 
     def __init__(self, root: Path, repository: str, app_login: str, artifacts: Path | None = None):
         self.root = root
