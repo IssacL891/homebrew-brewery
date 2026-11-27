@@ -150,7 +150,7 @@ jobs:
 
   report:
     needs: [scan, publish]
-    if: ${{ always() && github.ref == 'refs/heads/main' && github.event_name == 'schedule' && vars.BREWERY_ISSUE_NUMBER != '' && vars.BREWERY_APP_CLIENT_ID != '' }}
+    if: ${{ always() && github.ref == 'refs/heads/main' && github.event_name == 'schedule' && vars.BREWERY_APP_CLIENT_ID != '' }}
     runs-on: macos-latest
     timeout-minutes: 10
     steps:
@@ -171,6 +171,7 @@ jobs:
         run: python -m pip install -r automation/requirements.txt
 
       - name: Read scan results
+        continue-on-error: true
         if: ${{ !env.ACT && needs.scan.result == 'success' }}
         uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
         with:
@@ -178,6 +179,7 @@ jobs:
           path: ${{ runner.temp }}/brewery
 
       - name: Read publication results
+        continue-on-error: true
         if: ${{ !env.ACT && needs.publish.result == 'success' }}
         uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
         with:
@@ -193,13 +195,14 @@ jobs:
           private-key: ${{ secrets.BREWERY_APP_PRIVATE_KEY }}
           permission-issues: write
 
-      - name: Report changed problems
+      - name: Open failure issues and dispatch repairs
         if: ${{ !env.ACT }}
         env:
           GH_TOKEN: ${{ steps.reporter.outputs.token }}
           BREWERY_APP_BOT: ${{ vars.BREWERY_APP_BOT }}
           APP_SLUG: ${{ steps.reporter.outputs.app-slug }}
-          BREWERY_ISSUE_NUMBER: ${{ vars.BREWERY_ISSUE_NUMBER }}
+          BREWERY_T3_WEBHOOK_URL: ${{ secrets.BREWERY_T3_WEBHOOK_URL }}
+          BREWERY_T3_WEBHOOK_SECRET: ${{ secrets.BREWERY_T3_WEBHOOK_SECRET }}
           SCAN_STATUS: ${{ needs.scan.result }}
           PUBLISH_STATUS: ${{ needs.publish.result }}
         run: |
