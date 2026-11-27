@@ -85,7 +85,7 @@ class ArtifactTests(unittest.TestCase):
             path.parent.mkdir(parents=True)
             recipe = root / "recipes/dartotsu.sh"
             recipe.parent.mkdir()
-            shutil.copyfile(Path(__file__).parent / "fixtures/build/cask.sh", recipe)
+            shutil.copyfile(Path(__file__).parent / "fixtures/artifacts/cask.sh", recipe)
             path.write_text(DARTOTSU.replace("schema: 1", "schema: 2") + """
 upstream:
   repository: example/app
