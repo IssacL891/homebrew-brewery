@@ -37,6 +37,22 @@ A standard manifest uses `schema: 1`. Existing manifests with an explicit `direc
 
 Cask manifests declare the app bundle, macOS or architecture requirements, livecheck strategy, and cleanup paths. Formula manifests reference reviewed Ruby build and test code in `recipes/`. An optional patch is embedded with the recipe so the result works as standalone Homebrew Ruby. The existing `libsoil` formula stays manually maintained.
 
+### Add or reorganize cask categories
+
+Create a folder anywhere under `packages/casks/`, including inside another category, and put a cask YAML file in it. The scanner discovers the file automatically, and the generator mirrors the category under `Casks/`. Git records a new category once you add a file to it.
+
+To move a cask, keep its filename and token, move the YAML, and remove the old generated Ruby from its previous category. Then regenerate and run the drift check. For example, from the repository root, you can move Dartotsu into a nested category.
+
+```sh
+mkdir -p packages/casks/Reading/Manga
+git mv "packages/casks/Manga Readers/dartotsu.yaml" packages/casks/Reading/Manga/dartotsu.yaml
+git rm -- "Casks/Manga Readers/dartotsu.rb"
+.venv/bin/python automation/render.py
+.venv/bin/python automation/render.py --check
+```
+
+For a cask with both stable and prerelease channels, remove both old generated files, `<token>.rb` and `<token>-pre.rb`. To rename or move a whole category, move its YAML folder and apply the same cleanup to the generated files under the old path. If a manifest has a `directory` override, remove or update it to place the generated Ruby in the new category. Commit the YAML moves and Ruby changes together. Install commands keep working with the same token.
+
 ## Opt in to publishing missing binaries
 
 Use manifest schema 2 and add a build section only for packages whose
