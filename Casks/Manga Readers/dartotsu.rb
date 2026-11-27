@@ -18,3 +18,5 @@ cask "dartotsu" do
 
   app "Dartotsu.app"
 end
+
+# Intentional drift for the smoke test.
