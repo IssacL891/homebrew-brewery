@@ -2,6 +2,7 @@
 
 import argparse
 from dataclasses import dataclass
+from difflib import unified_diff
 from pathlib import Path
 import subprocess
 import sys
@@ -10,6 +11,7 @@ if __package__ in (None, ""):
     sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 from automation.manifests import Manifest, ManifestError, load_manifest
+from automation.package_diff import candidate_digests, prepare_bump
 from automation.releases import Candidate, ReleaseError, github_releases, livecheck_version, resolve_releases, version_key
 
 
@@ -24,6 +26,7 @@ class PackageResult:
     status: str
     message: str
     candidate: Candidate | None = None
+    files: dict[Path, str] | None = None
 
 
 def find_candidate(manifest: Manifest, channel: str, tap: str) -> Candidate | None:
@@ -47,7 +50,9 @@ def find_candidate(manifest: Manifest, channel: str, tap: str) -> Candidate | No
     return Candidate(version, version, {"universal": template.replace("{version}", version)})
 
 
-def scan(manifests: list[Manifest], selector: str | None = None, tap: str = DEFAULT_TAP) -> list[PackageResult]:
+def scan(
+    manifests: list[Manifest], selector: str | None = None, tap: str = DEFAULT_TAP, *, prepare: bool = False,
+) -> list[PackageResult]:
     selected = []
     for manifest in manifests:
         data = manifest.data
@@ -61,14 +66,17 @@ def scan(manifests: list[Manifest], selector: str | None = None, tap: str = DEFA
     results = []
     for manifest, channel, token in selected:
         kind = manifest.data["kind"]
+        files = None
         try:
             candidate = find_candidate(manifest, channel, tap)
             status = "candidate" if candidate else "current"
+            if prepare and candidate:
+                files = prepare_bump(manifest, channel, candidate, candidate_digests(candidate))
             message = f"{candidate.version} (tag {candidate.tag})" if candidate else "no newer eligible release"
-        except ReleaseError as exc:
+        except (ReleaseError, ManifestError) as exc:
             results.append(PackageResult(kind, token, channel, "warning", str(exc)))
         else:
-            results.append(PackageResult(kind, token, channel, status, message, candidate))
+            results.append(PackageResult(kind, token, channel, status, message, candidate, files))
 
     for result in results:
         print(f"{result.kind}:{result.token} {result.status} — {result.message}")
@@ -98,7 +106,14 @@ def main() -> int:
                 failed_manifests += 1
         if not manifests:
             raise ManifestError("no valid package manifests found")
-        results = scan(manifests, args.package, args.tap)
+        results = scan(manifests, args.package, args.tap, prepare=True)
+        for result in results:
+            for path, proposed in (result.files or {}).items():
+                original = (args.root / path).read_text(encoding="utf-8")
+                sys.stdout.writelines(unified_diff(
+                    original.splitlines(keepends=True), proposed.splitlines(keepends=True),
+                    fromfile=f"a/{path}", tofile=f"b/{path}",
+                ))
         warnings = sum(row.status == "warning" for row in results) + failed_manifests
         print(f"{len(results)} channels scanned, {warnings} warnings")
         return int(bool(args.package and warnings))

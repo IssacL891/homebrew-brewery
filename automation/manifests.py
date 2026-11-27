@@ -88,14 +88,33 @@ def validate_url(value, field: str, templated: bool = False) -> None:
         raise ManifestError(f"{field} must be an HTTP(S) URL without credentials")
 
 
-def validate_release(release, channel: str, fallback_url: str | None) -> None:
-    validate_mapping(release, {"version", "sha256", "tag", "url"}, channel)
-    for key, pattern in (("version", VERSION), ("sha256", SHA256)):
-        value = release.get(key)
-        if not isinstance(value, str) or not pattern.fullmatch(value):
-            raise ManifestError(f"{channel}.{key} is invalid")
+def validate_sha256(value, field: str) -> None:
+    if not isinstance(value, str) or not SHA256.fullmatch(value):
+        raise ManifestError(f"{field} is invalid")
+
+
+def validate_release(release, channel: str, fallback_url: str | None, kind: str, arch: str | None) -> None:
+    validate_mapping(release, {"version", "sha256", "tag", "url", "artifacts"}, channel)
+    version = release.get("version")
+    if not isinstance(version, str) or not VERSION.fullmatch(version):
+        raise ManifestError(f"{channel}.version is invalid")
     if "tag" in release and (not isinstance(release["tag"], str) or not VERSION.fullmatch(release["tag"])):
         raise ManifestError(f"{channel}.tag is invalid")
+    if "artifacts" in release:
+        if kind != "cask" or "url" in release or "sha256" in release:
+            raise ManifestError(f"{channel}.artifacts is only for architecture-specific cask downloads")
+        artifacts = release["artifacts"]
+        validate_mapping(artifacts, {"arm64", "x86_64"}, f"{channel}.artifacts")
+        if set(artifacts) != ({arch} if arch in ("arm64", "x86_64") else {"arm64", "x86_64"}):
+            raise ManifestError(f"{channel}.artifacts must cover the cask architectures")
+        for target, artifact in artifacts.items():
+            field = f"{channel}.artifacts.{target}"
+            validate_mapping(artifact, {"url", "sha256"}, field)
+            validate_url(artifact.get("url"), f"{field}.url")
+            validate_sha256(artifact.get("sha256"), f"{field}.sha256")
+        return
+
+    validate_sha256(release.get("sha256"), f"{channel}.sha256")
     if "url" in release:
         validate_url(release["url"], f"{channel}.url")
     elif not fallback_url:
@@ -156,7 +175,7 @@ def validate_manifest(manifest: Manifest) -> None:
     if "stable" not in channels:
         raise ManifestError("channels.stable is required")
     for channel, release in channels.items():
-        validate_release(release, channel, data.get("url"))
+        validate_release(release, channel, data.get("url"), kind, data.get("arch"))
 
     if "upstream" in data:
         validate_upstream(data["upstream"])

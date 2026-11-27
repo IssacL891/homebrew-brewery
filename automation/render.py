@@ -40,17 +40,27 @@ def livecheck_stanzas(data: dict) -> list[str]:
 
 
 def render_cask(data: dict, token: str, release: dict, sibling: str | None) -> list[str]:
-    lines = [
-        f"cask {ruby_string(token)} do",
-        f"  version {ruby_string(release['version'])}",
-        f"  sha256 {ruby_string(release['sha256'])}",
-        "",
-        f"  url {ruby_url(data, release)}",
+    lines = [f"cask {ruby_string(token)} do", f"  version {ruby_string(release['version'])}"]
+    if "artifacts" in release and len(release["artifacts"]) == 2:
+        for target, block in (("arm64", "on_arm"), ("x86_64", "on_intel")):
+            artifact = release["artifacts"][target]
+            lines.extend([
+                "",
+                f"  {block} do",
+                f"    sha256 {ruby_string(artifact['sha256'])}",
+                f"    url {ruby_string(artifact['url'])}",
+                "  end",
+            ])
+        lines.append("")
+    else:
+        artifact = next(iter(release["artifacts"].values())) if "artifacts" in release else release
+        lines.extend([f"  sha256 {ruby_string(artifact['sha256'])}", "", f"  url {ruby_url(data, artifact)}"])
+    lines.extend([
         f"  name {ruby_string(data['name'])}",
         f"  desc {ruby_string(data['desc'])}",
         f"  homepage {ruby_string(data['homepage'])}",
         *livecheck_stanzas(data),
-    ]
+    ])
     if sibling:
         lines.extend(["", f"  conflicts_with cask: {ruby_string(sibling)}"])
     if "arch" in data or data.get("macos"):
