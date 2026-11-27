@@ -1,0 +1,189 @@
+name: Brewery package bumps
+
+on:
+  schedule:
+    - cron: "0 4,16 * * *"
+  workflow_dispatch:
+    inputs:
+      package:
+        description: "Optional package, for example cask:dartotsu"
+        type: string
+      publish:
+        description: "Open and queue bump PRs after cutover"
+        type: boolean
+        default: false
+
+permissions:
+  contents: read
+
+concurrency:
+  group: brewery-package-bumps
+  cancel-in-progress: false
+
+env:
+  HOMEBREW_NO_AUTO_UPDATE: "1"
+  HOMEBREW_NO_ANALYTICS: "1"
+  PYTHONDONTWRITEBYTECODE: "1"
+
+jobs:
+  scan:
+    runs-on: macos-latest
+    timeout-minutes: 30
+    steps:
+      - name: Check out the tap
+        if: ${{ !env.ACT }}
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          persist-credentials: false
+
+      - name: Set up Python
+        if: ${{ !env.ACT }}
+        uses: actions/setup-python@a309ff8b426b58ec0e2a45f0f869d46889d02405 # v6.2.0
+        with:
+          python-version: "3.12"
+
+      - name: Scan and verify release assets
+        if: ${{ !env.ACT }}
+        env:
+          GH_TOKEN: ${{ github.token }}
+          PACKAGE: ${{ inputs.package }}
+          TAP: ${{ github.repository_owner }}/brewery
+        run: |
+          python -m pip install -r automation/requirements.txt
+          python automation/render.py --check
+          brew tap --custom-remote "$TAP" "$GITHUB_WORKSPACE"
+          brew trust --tap "$TAP"
+          args=(--dry-run --tap "$TAP" --result-file "$RUNNER_TEMP/brewery-scan.json")
+          if [[ -n "$PACKAGE" ]]; then args+=(--package "$PACKAGE"); fi
+          python automation/bumps.py scan "${args[@]}"
+
+      - name: Save the prepared bump report
+        if: ${{ !env.ACT }}
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: brewery-scan
+          path: ${{ runner.temp }}/brewery-scan.json
+          retention-days: 3
+
+      - name: Exercise release and publishing fixtures on the local runner
+        if: ${{ env.ACT }}
+        working-directory: ${{ vars.BREWERY_FIXTURE_ROOT }}
+        env:
+          FIXTURE_PYTHON: ${{ vars.BREWERY_FIXTURE_PYTHON }}
+        run: |
+          test "$(uname -s)" = Darwin
+          "${FIXTURE_PYTHON:-python3}" -m unittest discover -s tests -v
+
+  publish:
+    needs: scan
+    if: ${{ github.ref == 'refs/heads/main' && vars.BREWERY_PUBLISH_ENABLED == 'true' && (github.event_name == 'schedule' || inputs.publish) }}
+    runs-on: macos-latest
+    timeout-minutes: 20
+    steps:
+      - name: Check out the same base
+        if: ${{ !env.ACT }}
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Set up Python
+        if: ${{ !env.ACT }}
+        uses: actions/setup-python@a309ff8b426b58ec0e2a45f0f869d46889d02405 # v6.2.0
+        with:
+          python-version: "3.12"
+
+      - name: Install the publisher dependencies
+        if: ${{ !env.ACT }}
+        run: python -m pip install -r automation/requirements.txt
+
+      - name: Read the trusted scan report
+        if: ${{ !env.ACT }}
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
+        with:
+          name: brewery-scan
+          path: ${{ runner.temp }}/brewery
+
+      - name: Obtain a tap-scoped publishing token
+        if: ${{ !env.ACT }}
+        id: app
+        uses: actions/create-github-app-token@7bd03711494f032dfa3be3558f7dc8787b0be333 # v3.1.0
+        with:
+          client-id: ${{ vars.BREWERY_APP_CLIENT_ID }}
+          private-key: ${{ secrets.BREWERY_APP_PRIVATE_KEY }}
+          permission-contents: write
+          permission-pull-requests: write
+
+      - name: Publish verified bumps
+        if: ${{ !env.ACT }}
+        env:
+          GH_TOKEN: ${{ steps.app.outputs.token }}
+          BREWERY_APP_BOT: ${{ vars.BREWERY_APP_BOT }}
+        run: |
+          python automation/publish.py "$RUNNER_TEMP/brewery/brewery-scan.json" \
+            --output "$RUNNER_TEMP/brewery-publish.json"
+
+      - name: Save publication outcomes
+        if: ${{ !env.ACT }}
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: brewery-publish
+          path: ${{ runner.temp }}/brewery-publish.json
+          retention-days: 3
+
+  report:
+    needs: [scan, publish]
+    if: ${{ always() && github.ref == 'refs/heads/main' && github.event_name == 'schedule' && vars.BREWERY_ISSUE_NUMBER != '' && vars.BREWERY_APP_CLIENT_ID != '' }}
+    runs-on: macos-latest
+    timeout-minutes: 10
+    steps:
+      - name: Check out reporting code
+        if: ${{ !env.ACT }}
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          persist-credentials: false
+
+      - name: Set up Python
+        if: ${{ !env.ACT }}
+        uses: actions/setup-python@a309ff8b426b58ec0e2a45f0f869d46889d02405 # v6.2.0
+        with:
+          python-version: "3.12"
+
+      - name: Install the reporting dependencies
+        if: ${{ !env.ACT }}
+        run: python -m pip install -r automation/requirements.txt
+
+      - name: Read scan results
+        if: ${{ !env.ACT && needs.scan.result == 'success' }}
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
+        with:
+          name: brewery-scan
+          path: ${{ runner.temp }}/brewery
+
+      - name: Read publication results
+        if: ${{ !env.ACT && needs.publish.result == 'success' }}
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
+        with:
+          name: brewery-publish
+          path: ${{ runner.temp }}/brewery
+
+      - name: Obtain an issues-only token
+        if: ${{ !env.ACT }}
+        id: reporter
+        uses: actions/create-github-app-token@7bd03711494f032dfa3be3558f7dc8787b0be333 # v3.1.0
+        with:
+          client-id: ${{ vars.BREWERY_APP_CLIENT_ID }}
+          private-key: ${{ secrets.BREWERY_APP_PRIVATE_KEY }}
+          permission-issues: write
+
+      - name: Report changed problems
+        if: ${{ !env.ACT }}
+        env:
+          GH_TOKEN: ${{ steps.reporter.outputs.token }}
+          BREWERY_APP_BOT: ${{ vars.BREWERY_APP_BOT }}
+          BREWERY_ISSUE_NUMBER: ${{ vars.BREWERY_ISSUE_NUMBER }}
+          SCAN_STATUS: ${{ needs.scan.result }}
+          PUBLISH_STATUS: ${{ needs.publish.result }}
+        run: |
+          python automation/notifications.py --scan "$RUNNER_TEMP/brewery/brewery-scan.json" \
+            --publish "$RUNNER_TEMP/brewery/brewery-publish.json"

@@ -1,8 +1,10 @@
 """Report eligible Brewery bumps without writing to the tap."""
 
 import argparse
-from dataclasses import dataclass
+from dataclasses import asdict, dataclass
 from difflib import unified_diff
+import json
+import os
 from pathlib import Path
 import subprocess
 import sys
@@ -27,6 +29,20 @@ class PackageResult:
     message: str
     candidate: Candidate | None = None
     files: dict[Path, str] | None = None
+
+
+def result_to_json(result: PackageResult) -> dict:
+    data = asdict(result)
+    if result.files:
+        data["files"] = {path.as_posix(): contents for path, contents in result.files.items()}
+    return data
+
+
+def result_from_json(data: dict) -> PackageResult:
+    candidate = Candidate(**data["candidate"]) if data["candidate"] else None
+    files = {Path(path): contents for path, contents in data["files"].items()} if data["files"] else None
+    return PackageResult(data["kind"], data["token"], data["channel"], data["status"],
+                         data["message"], candidate, files)
 
 
 def find_candidate(manifest: Manifest, channel: str, tap: str) -> Candidate | None:
@@ -88,6 +104,7 @@ def main() -> int:
     parser.add_argument("command", choices=["scan"])
     parser.add_argument("--dry-run", action="store_true", required=True)
     parser.add_argument("--package")
+    parser.add_argument("--result-file", type=Path)
     parser.add_argument("--root", type=Path, default=Path(__file__).resolve().parents[1])
     parser.add_argument("--tap", default=DEFAULT_TAP)
     args = parser.parse_args()
@@ -114,8 +131,20 @@ def main() -> int:
                     original.splitlines(keepends=True), proposed.splitlines(keepends=True),
                     fromfile=f"a/{path}", tofile=f"b/{path}",
                 ))
+        if args.result_file:
+            base = subprocess.run(
+                ["git", "-C", str(args.root), "rev-parse", "HEAD"], check=True, capture_output=True, text=True,
+            ).stdout.strip()
+            args.result_file.write_text(json.dumps({
+                "base_sha": base, "packages": [result_to_json(result) for result in results],
+            }), encoding="utf-8")
         warnings = sum(row.status == "warning" for row in results) + failed_manifests
         print(f"{len(results)} channels scanned, {warnings} warnings")
+        if summary := os.environ.get("GITHUB_STEP_SUMMARY"):
+            with Path(summary).open("a", encoding="utf-8") as output:
+                output.write(f"### Brewery package scan\n\n{len(results)} channels scanned, {warnings} warnings.\n\n")
+                for row in results:
+                    output.write(f"- {row.kind}:{row.token} **{row.status}** — {row.message}\n")
         return int(bool(args.package and warnings))
     except (ManifestError, OSError, subprocess.SubprocessError) as exc:
         print(f"scan could not run: {exc}", file=sys.stderr)
