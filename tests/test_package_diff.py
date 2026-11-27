@@ -1,11 +1,13 @@
 import hashlib
+from http.client import IncompleteRead
 import tempfile
 import unittest
 from pathlib import Path
+from unittest.mock import patch
 
 from automation.manifests import ManifestError, load_manifest
-from automation.package_diff import prepare_bump, validate_diff
-from automation.releases import Candidate
+from automation.package_diff import checksum_download, prepare_bump, validate_diff
+from automation.releases import Candidate, ReleaseError
 from automation.render import render_tree
 from test_render import DARTOTSU, PREVIEW
 
@@ -74,3 +76,9 @@ class PackageDiffTests(unittest.TestCase):
         self.assertIn(f'on_intel do\n    sha256 "{intel}"', result[STABLE_CASK])
         self.assertIn("Dartotsu-arm64.dmg", result[STABLE_CASK])
         self.assertIn("Dartotsu-intel.dmg", result[STABLE_CASK])
+
+    def test_truncated_http_response_is_a_package_failure(self):
+        with patch("automation.package_diff.build_opener") as opener:
+            opener.return_value.open.side_effect = IncompleteRead(b"partial")
+            with self.assertRaisesRegex(ReleaseError, "package download failed"):
+                checksum_download("https://example.org/asset.zip")

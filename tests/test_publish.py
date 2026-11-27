@@ -1,9 +1,18 @@
+import subprocess
+import tempfile
 import unittest
 from pathlib import Path
+from unittest.mock import patch
 
 from automation.bumps import PackageResult
-from automation.publish import PublishError, publish_bumps
-from test_package_diff import CANDIDATE
+from automation.manifests import load_manifest
+from automation.package_diff import prepare_bump
+from automation.pr_validation import bump_branch, git
+from automation.publish import GitHub, PublishError, publish_bumps
+from automation.releases import Candidate
+from automation.render import render_tree
+from test_package_diff import CANDIDATE, DIGEST, MANIFEST, PRERELEASE_CASK
+from test_render import DARTOTSU, PREVIEW
 
 
 BASE = "a" * 40
@@ -109,3 +118,58 @@ class PublisherTests(unittest.TestCase):
         result, = publish_bumps(api, BASE, [PACKAGE], {("cask", "dartotsu"): "1.0.0"})
         self.assertEqual(result.status, "pending")
         self.assertEqual(api.changes, [("refresh", BASE, BRANCH, HEAD, 3), ("merge", 3, updated)])
+
+    def test_refresh_carries_the_sibling_bump_and_rejects_a_stale_head(self):
+        with tempfile.TemporaryDirectory() as scratch:
+            root = Path(scratch).resolve()
+            repo = root / "tap"
+            repo.mkdir()
+            git(repo, "init", "-q", "-b", "main")
+            git(repo, "config", "user.name", "Brewery fixture")
+            git(repo, "config", "user.email", "brewery@example.invalid")
+            git(repo, "config", "commit.gpgsign", "false")
+            manifest = repo / MANIFEST
+            manifest.parent.mkdir(parents=True)
+            manifest.write_text(DARTOTSU + PREVIEW)
+            render_tree(repo, check=False)
+            git(repo, "add", ".")
+            git(repo, "commit", "-qm", "Base")
+
+            pre = Candidate("1.2.3-alpha", "v1.2.3-alpha", CANDIDATE.urls)
+            branch = bump_branch("cask", "dartotsu-pre", pre.version)
+            git(repo, "switch", "-qc", branch)
+            old = prepare_bump(load_manifest(manifest), "pre", pre, {"universal": DIGEST})
+            for path, contents in old.items():
+                (repo / path).write_text(contents)
+            git(repo, "commit", "-qam", "Preview bump")
+            old_head = git(repo, "rev-parse", "HEAD").strip()
+            git(repo, "switch", "-q", "main")
+            sibling = prepare_bump(load_manifest(manifest), "stable", CANDIDATE, {"universal": DIGEST})
+            for path, contents in sibling.items():
+                (repo / path).write_text(contents)
+            git(repo, "commit", "-qam", "Merged stable bump")
+            current_base = git(repo, "rev-parse", "HEAD").strip()
+
+            remote = root / "remote.git"
+            git(root, "clone", "--bare", str(repo), str(remote))
+            changes = prepare_bump(load_manifest(manifest), "pre", pre, {"universal": DIGEST})
+            updated = PackageResult("cask", "dartotsu-pre", "pre", "candidate", pre.version, pre, changes)
+            api = GitHub(repo, "fixture/tap", GitHubFixture.app_login)
+
+            with patch.dict("os.environ", {"GH_TOKEN": "local-test-placeholder"}):
+                sha = api.refresh_branch(root, updated, str(remote), branch, current_base, old_head)
+                next_head = git(
+                    remote, "-c", "user.name=Fixture", "-c", "user.email=fixture@example.invalid",
+                    "commit-tree", f"{sha}^{{tree}}", "-p", sha, "-m", "Commit after plan publication",
+                ).strip()
+                git(remote, "update-ref", f"refs/heads/{branch}", next_head, sha)
+                with self.assertRaises(subprocess.CalledProcessError):
+                    api.refresh_branch(root, updated, str(remote), branch, current_base, old_head)
+            self.assertEqual(git(remote, "rev-parse", branch).strip(), next_head)
+            self.assertEqual(git(remote, "show", "-s", "--format=%P", sha).split(), [old_head, current_base])
+            self.assertEqual(
+                set(git(remote, "diff", "--name-only", "-z", current_base, sha).strip("\0").split("\0")),
+                {str(MANIFEST), str(PRERELEASE_CASK)},
+            )
+            self.assertIn('version: "1.2.3"', git(remote, "show", f"{sha}:{MANIFEST}"))
+            self.assertIn('version: "1.2.3-alpha"', git(remote, "show", f"{sha}:{MANIFEST}"))

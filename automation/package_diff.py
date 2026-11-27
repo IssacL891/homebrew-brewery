@@ -2,6 +2,7 @@
 
 from copy import deepcopy
 import hashlib
+from http.client import HTTPException
 from pathlib import Path
 from urllib.error import URLError
 from urllib.parse import urlsplit
@@ -35,7 +36,10 @@ def checksum_download(url: str) -> str:
                 size += len(chunk)
             if size == 0:
                 raise ReleaseError("download returned an empty artifact")
-    except (URLError, OSError) as exc:
+            length = response.headers.get("Content-Length")
+            if length and (not length.isdecimal() or size != int(length)):
+                raise ReleaseError("package download ended before its advertised length")
+    except (URLError, OSError, HTTPException) as exc:
         status = getattr(exc, "code", None)
         message = f"package download failed (HTTP {status})" if status else "package download failed"
         raise ReleaseError(message) from None
