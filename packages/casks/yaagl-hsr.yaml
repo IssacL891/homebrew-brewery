@@ -19,5 +19,8 @@ upstream:
     universal: Yaagl.HSR.app.tar.gz
 channels:
   stable:
+    version: "0.4.0"
+    sha256: "1f3d3ca8d7b0d7d340d9dd79e0d3a33e0386f022fecaa75dfe1b9d2becbfac6e"
+  pre:
     version: "0.4.1-alpha"
     sha256: "c293e5a5a759246ed9ffa7fb97665b9b061c45adb1912ed81ded0305fdecc74b"

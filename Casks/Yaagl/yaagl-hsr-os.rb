@@ -14,6 +14,8 @@ cask "yaagl-hsr-os" do
     strategy :git
   end
 
+  conflicts_with cask: "yaagl-hsr-os-pre"
+
   depends_on :macos
 
   app "Yaagl HSR OS.app"

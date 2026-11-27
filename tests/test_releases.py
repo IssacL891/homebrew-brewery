@@ -1,6 +1,7 @@
 import contextlib
 import io
 import subprocess
+import tempfile
 import unittest
 from pathlib import Path
 from unittest.mock import patch
@@ -8,9 +9,9 @@ from unittest.mock import patch
 from automation.bumps import main, scan
 from automation.manifests import load_manifest
 from automation.releases import Candidate, ReleaseError, resolve_releases
+from test_render import DARTOTSU as DARTOTSU_MANIFEST
 
 
-ROOT = Path(__file__).resolve().parents[1]
 DARTOTSU = {
     "repository": "aayush2622/Dartotsu",
     "tag_prefix": "v",
@@ -73,17 +74,22 @@ class ReleaseTests(unittest.TestCase):
             resolve_releases([release(YAAGL, "not-a-version", pre=True)], YAAGL, "0.4.0", "pre")
 
     def test_mixed_scan_reports_package_failure_and_finishes(self):
-        manifests = [
-            load_manifest(ROOT / "packages/casks/dartotsu.yaml"),
-            load_manifest(ROOT / "packages/casks/yaagl-hsr-os.yaml"),
-        ]
-        with patch("automation.bumps.find_candidate", side_effect=[
-            ReleaseError("missing macOS asset"), Candidate("0.4.1", "0.4.1", {"universal": "https://example.org/app.zip"}),
-        ]), contextlib.redirect_stdout(io.StringIO()) as console:
-            result = scan(manifests)
+        with tempfile.TemporaryDirectory() as scratch:
+            directory = Path(scratch) / "packages/casks"
+            directory.mkdir(parents=True)
+            for token in ("dartotsu", "healthy"):
+                (directory / f"{token}.yaml").write_text(
+                    DARTOTSU_MANIFEST.replace("token: dartotsu", f"token: {token}"),
+                )
+            manifests = [load_manifest(path) for path in sorted(directory.glob("*.yaml"))]
+            with patch("automation.bumps.find_candidate", side_effect=[
+                ReleaseError("missing macOS asset"),
+                Candidate("1.2.3", "1.2.3", {"universal": "https://example.org/app.zip"}),
+            ]), contextlib.redirect_stdout(io.StringIO()) as console:
+                result = scan(manifests)
         self.assertEqual([row.status for row in result], ["warning", "candidate"])
         self.assertIn("dartotsu", console.getvalue())
-        self.assertIn("yaagl-hsr-os", console.getvalue())
+        self.assertIn("healthy", console.getvalue())
 
     def test_shared_homebrew_failure_fails_before_scanning_packages(self):
         with (
