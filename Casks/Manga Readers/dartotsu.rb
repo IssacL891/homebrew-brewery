@@ -1,4 +1,4 @@
-# Generated from packages/casks/dartotsu.yaml. Edit the YAML and regenerate.
+# Generated from packages/casks/Manga Readers/dartotsu.yaml. Edit the YAML and regenerate.
 
 cask "dartotsu" do
   version "1.0.0"

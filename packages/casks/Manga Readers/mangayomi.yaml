@@ -1,7 +1,6 @@
 schema: 1
 kind: cask
 token: mangayomi
-directory: Manga Readers
 name: mangayomi
 desc: Free and open source application for reading manga, novels, and watching anime
 homepage: https://github.com/kodjodevf/mangayomi

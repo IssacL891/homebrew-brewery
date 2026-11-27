@@ -20,7 +20,7 @@ class YaaglChannelTests(unittest.TestCase):
     def test_all_editions_have_conflicting_stable_and_prerelease_definitions(self):
         for token, asset in EXPECTED_ASSETS.items():
             with self.subTest(token=token):
-                manifest = load_manifest(ROOT / "packages" / "casks" / f"{token}.yaml")
+                manifest = load_manifest(ROOT / "packages" / "casks" / "Yaagl" / f"{token}.yaml")
                 self.assertEqual(manifest.data["upstream"]["assets"], {"universal": asset})
                 self.assertEqual(set(manifest.data["channels"]), {"stable", "pre"})
                 definitions = render_manifest(manifest)

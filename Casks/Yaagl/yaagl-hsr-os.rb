@@ -1,4 +1,4 @@
-# Generated from packages/casks/yaagl-hsr-os.yaml. Edit the YAML and regenerate.
+# Generated from packages/casks/Yaagl/yaagl-hsr-os.yaml. Edit the YAML and regenerate.
 
 cask "yaagl-hsr-os" do
   version "0.4.0"

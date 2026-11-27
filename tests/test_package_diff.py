@@ -13,7 +13,7 @@ from test_render import DARTOTSU, PREVIEW
 
 
 DIGEST = hashlib.sha256(b"new artifact").hexdigest()
-MANIFEST = Path("packages/casks/dartotsu.yaml")
+MANIFEST = Path("packages/casks/Manga Readers/dartotsu.yaml")
 STABLE_CASK = Path("Casks/Manga Readers/dartotsu.rb")
 PRERELEASE_CASK = Path("Casks/Manga Readers/dartotsu-pre.rb")
 CANDIDATE = Candidate(

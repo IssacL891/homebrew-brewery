@@ -1,7 +1,6 @@
 schema: 1
 kind: cask
 token: goofcord
-directory: Discord
 name: Goofcord
 desc: Modified version of Discord with privacy enhancements
 homepage: https://github.com/Milkshiift/GoofCord

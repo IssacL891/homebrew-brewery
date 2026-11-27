@@ -1,7 +1,6 @@
 schema: 1
 kind: cask
 token: godot-launcher
-directory: Godot
 name: godot-launcher
 desc: Open-source launcher for Godot game development
 homepage: https://github.com/godotlauncher/launcher

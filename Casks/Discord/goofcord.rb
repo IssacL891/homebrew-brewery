@@ -1,4 +1,4 @@
-# Generated from packages/casks/goofcord.yaml. Edit the YAML and regenerate.
+# Generated from packages/casks/Discord/goofcord.yaml. Edit the YAML and regenerate.
 
 cask "goofcord" do
   version "2.3.1"

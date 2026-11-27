@@ -1,4 +1,4 @@
-# Generated from packages/casks/godot-launcher.yaml. Edit the YAML and regenerate.
+# Generated from packages/casks/Godot/godot-launcher.yaml. Edit the YAML and regenerate.
 
 cask "godot-launcher" do
   version "1.14.0"

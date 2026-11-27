@@ -1,7 +1,6 @@
 schema: 1
 kind: cask
 token: grimoire
-directory: Deadlock
 name: Grimoire
 desc: Mod manager and companion tool for Deadlock
 homepage: https://github.com/Slush97/grimoire

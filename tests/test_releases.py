@@ -99,3 +99,18 @@ class ReleaseTests(unittest.TestCase):
         ):
             self.assertEqual(main(), 1)
         self.assertIn("scan could not run", errors.getvalue())
+
+    def test_cli_scans_a_manifest_in_a_category_folder(self):
+        with tempfile.TemporaryDirectory() as scratch:
+            path = Path(scratch) / "packages/casks/Manga Readers/dartotsu.yaml"
+            path.parent.mkdir(parents=True)
+            path.write_text(DARTOTSU_MANIFEST)
+            with (
+                patch("sys.argv", ["bumps.py", "scan", "--dry-run", "--root", scratch, "--package", "cask:dartotsu"]),
+                patch("automation.bumps.subprocess.run"),
+                patch("automation.bumps.find_candidate", return_value=None) as lookup,
+                contextlib.redirect_stdout(io.StringIO()) as console,
+            ):
+                self.assertEqual(main(), 0)
+            self.assertEqual(lookup.call_count, 1)
+            self.assertIn("cask:dartotsu current", console.getvalue())

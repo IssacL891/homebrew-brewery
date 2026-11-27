@@ -18,7 +18,7 @@ from automation.build_artifacts import (
     BuildError, build_identity, check_receipt, finish_candidate, public_url, publish_release, read_published, receipt_digests,
 )
 from automation.bumps import PackageResult, needs_binary, result_from_json
-from automation.manifests import ManifestError, load_manifest, yaml_parser
+from automation.manifests import MANIFEST_DIRS, ManifestError, load_manifest, manifest_paths, yaml_parser
 from automation.package_diff import candidate_digests, checksum_download, prepare_bump
 from automation.pr_validation import FULL_SHA, bump_branch, git
 from automation.releases import Candidate, ReleaseError, github_releases, resolve_releases, version_key
@@ -236,8 +236,12 @@ class GitHub:
 
     def manifest_for(self, package: PackageResult):
         base_token = package.token.removesuffix("-pre") if package.channel == "pre" else package.token
-        directory = "casks" if package.kind == "cask" else "formulae"
-        return load_manifest(self.root / "packages" / directory / f"{base_token}.yaml")
+        directory = self.root / "packages" / MANIFEST_DIRS[package.kind]
+        matches = [path for path in manifest_paths(self.root)
+                   if path.stem == base_token and path.is_relative_to(directory)]
+        if len(matches) != 1:
+            raise PublishError(f"expected one manifest for {package.kind}:{base_token}")
+        return load_manifest(matches[0], root=self.root)
 
     def expected_candidate(self, manifest, channel: str, proposed: Candidate) -> Candidate:
         data = manifest.data
@@ -314,7 +318,7 @@ class GitHub:
             previous = Path(temporary) / "previous"
             git(self.root, "worktree", "add", "--detach", str(previous), merge_base)
             try:
-                original = load_manifest(previous / manifest_path)
+                original = load_manifest(previous / manifest_path, root=previous)
                 expected = prepare_bump(original, package.channel, package.candidate, artifacts)
                 actual = {path: git(self.root, "show", f"{head}:{path.as_posix()}") for path in changes}
                 if expected != actual:
@@ -374,8 +378,8 @@ def main() -> int:
             raise PublishError("main moved after the scan; next run will regenerate candidates")
         packages = [result_from_json(entry) for entry in report["packages"]]
         versions = {}
-        for path in sorted((root / "packages").glob("*/*.yaml")):
-            data = load_manifest(path).data
+        for path in manifest_paths(root):
+            data = load_manifest(path, root=root).data
             for channel, release in data["channels"].items():
                 token = data["token"] + ("-pre" if channel == "pre" else "")
                 versions[data["kind"], token] = release["version"]

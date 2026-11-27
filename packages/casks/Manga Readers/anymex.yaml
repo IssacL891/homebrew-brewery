@@ -1,7 +1,6 @@
 schema: 1
 kind: cask
 token: anymex
-directory: Manga Readers
 name: AnymeX
 desc: Multiservice tracking client for anime and managa progress
 homepage: https://github.com/RyanYuuki/AnymeX

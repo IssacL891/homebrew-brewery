@@ -21,6 +21,10 @@ brew "<formula>"
 
 Edit the YAML for a managed package in `packages/casks/` or `packages/formulae/`. Generate the Homebrew definitions and commit the YAML and generated Ruby together.
 
+Cask YAML files are grouped by category under `packages/casks/`. To add a cask, copy a similar manifest into its category, give it a unique filename and matching token, and update the download and app fields. [Example cask](../packages/casks/Godot/godot-launcher.yaml)
+
+The generator mirrors the category under `Casks/`. For example, `packages/casks/Manga Readers/dartotsu.yaml` generates `Casks/Manga Readers/dartotsu.rb`. Keep stable and prerelease settings for the same package in that package’s YAML file.
+
 ```sh
 python3 -m venv .venv
 .venv/bin/python -m pip install -r automation/requirements.txt
@@ -29,7 +33,7 @@ python3 -m venv .venv
 .venv/bin/python -m unittest discover -s tests -v
 ```
 
-A standard manifest uses `schema: 1` and a `token` matching its filename. The optional `directory` preserves the location under `Casks/` or `Formula/`. Set the version and SHA-256 under `channels.stable` or `channels.pre`. The shared `url` supports `{version}` and `{tag}`. A channel can provide an exact URL instead. Defining both channels generates the plain token and its `-pre` counterpart with reciprocal conflicts.
+A standard manifest uses `schema: 1`. Existing manifests with an explicit `directory` continue to use it as their output location under `Casks/` or `Formula/`. Set the version and SHA-256 under `channels.stable` or `channels.pre`. The shared `url` supports `{version}` and `{tag}`. A channel can provide an exact URL instead. Defining both channels generates the plain token and its `-pre` counterpart with reciprocal conflicts.
 
 Cask manifests declare the app bundle, macOS or architecture requirements, livecheck strategy, and cleanup paths. Formula manifests reference reviewed Ruby build and test code in `recipes/`. An optional patch is embedded with the recipe so the result works as standalone Homebrew Ruby. The existing `libsoil` formula stays manually maintained.
 

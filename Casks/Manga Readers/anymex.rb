@@ -1,4 +1,4 @@
-# Generated from packages/casks/anymex.yaml. Edit the YAML and regenerate.
+# Generated from packages/casks/Manga Readers/anymex.yaml. Edit the YAML and regenerate.
 
 cask "anymex" do
   version "3.2.1"

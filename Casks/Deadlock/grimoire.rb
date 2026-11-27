@@ -1,4 +1,4 @@
-# Generated from packages/casks/grimoire.yaml. Edit the YAML and regenerate.
+# Generated from packages/casks/Deadlock/grimoire.yaml. Edit the YAML and regenerate.
 
 cask "grimoire" do
   version "1.35.1"

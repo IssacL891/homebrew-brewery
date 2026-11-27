@@ -130,5 +130,23 @@ class RenderTests(unittest.TestCase):
             render_tree(self.root, check=True)
 
 
+    def test_category_path_drives_output_without_a_directory_field(self):
+        text = DARTOTSU.replace("directory: Manga Readers\n", "")
+        self.manifest(text, "packages/casks/Media/Manga Readers/dartotsu.yaml")
+
+        self.assertEqual(render_tree(self.root, check=False), [])
+        output = self.root / "Casks/Media/Manga Readers/dartotsu.rb"
+        self.assertTrue(output.is_file())
+        self.assertIn("Generated from packages/casks/Media/Manga Readers/dartotsu.yaml", output.read_text())
+        self.assertEqual(render_tree(self.root, check=True), [])
+
+    def test_duplicate_cask_token_is_rejected_across_categories(self):
+        text = DARTOTSU.replace("directory: Manga Readers\n", "")
+        for category in ("Manga Readers", "Apps"):
+            self.manifest(text, f"packages/casks/{category}/dartotsu.yaml")
+        with self.assertRaisesRegex(ManifestError, "duplicate output token"):
+            render_tree(self.root, check=True)
+
+
 if __name__ == "__main__":
     unittest.main()

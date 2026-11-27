@@ -14,14 +14,13 @@ if __package__ in (None, ""):
 
 from automation.build_artifacts import BuildError, read_published
 from automation.bumps import DEFAULT_REPOSITORY, find_candidate, needs_binary
-from automation.manifests import ManifestError, load_manifest
+from automation.manifests import ManifestError, is_manifest_path, load_manifest
 from automation.package_diff import candidate_digests, validate_diff
 from automation.releases import Candidate, ReleaseError
 from automation.render import render_tree
 
 
 FULL_SHA = re.compile(r"[a-f0-9]{40}\Z")
-PACKAGE_PATH = re.compile(r"packages/(casks|formulae)/[^/]+\.yaml\Z")
 
 
 def bump_branch(kind: str, token: str, version: str) -> str:
@@ -44,13 +43,13 @@ def validate_pr_files(
     base: Path, head: Path, changed_paths, branch: str,
 ) -> Candidate:
     paths = set(changed_paths)
-    package_files = [path for path in paths if PACKAGE_PATH.fullmatch(path.as_posix())]
+    package_files = [path for path in paths if is_manifest_path(path)]
     if len(package_files) != 1:
         raise ManifestError("a bump must change exactly one existing manifest")
 
     package_path = package_files[0]
-    original = load_manifest(regular_file(base, package_path))
-    proposed = load_manifest(regular_file(head, package_path))
+    original = load_manifest(regular_file(base, package_path), root=base)
+    proposed = load_manifest(regular_file(head, package_path), root=head)
     old_data = original.data
     new_data = proposed.data
     original_channels = old_data["channels"]

@@ -1,4 +1,4 @@
-# Generated from packages/casks/yaagl-zzz-os.yaml. Edit the YAML and regenerate.
+# Generated from packages/casks/Yaagl/yaagl-zzz-os.yaml. Edit the YAML and regenerate.
 
 cask "yaagl-zzz-os-pre" do
   version "0.4.1-alpha"

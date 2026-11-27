@@ -1,7 +1,6 @@
 schema: 1
 kind: cask
 token: yaagl-zzz
-directory: Yaagl
 name: Yet Another Anime Game Launcher
 desc: Launcher for an anime game overseas
 homepage: https://github.com/yaagl/yet-another-anime-game-launcher

@@ -1,4 +1,4 @@
-# Generated from packages/casks/mangayomi.yaml. Edit the YAML and regenerate.
+# Generated from packages/casks/Manga Readers/mangayomi.yaml. Edit the YAML and regenerate.
 
 cask "mangayomi" do
   version "0.9.97"

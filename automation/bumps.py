@@ -13,7 +13,7 @@ if __package__ in (None, ""):
     sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 from automation.build_artifacts import BuildError, read_published, stage_build
-from automation.manifests import Manifest, ManifestError, load_manifest
+from automation.manifests import Manifest, ManifestError, load_manifest, manifest_paths
 from automation.package_diff import candidate_digests, prepare_bump
 from automation.releases import Candidate, ReleaseError, github_releases, livecheck_version, resolve_releases, version_key
 
@@ -147,14 +147,14 @@ def main() -> int:
         if args.build_dir and (os.environ.get("RUNNER_ENVIRONMENT") != "github-hosted" or os.environ.get("ACT")):
             raise ManifestError("package build staging requires a disposable GitHub-hosted runner")
         subprocess.run(["brew", "--version"], check=True, capture_output=True, timeout=10)
-        paths = sorted((args.root / "packages").glob("*/*.yaml"))
+        paths = manifest_paths(args.root)
         if not paths:
             raise ManifestError("no package manifests found")
         manifests = []
         failed_manifests = 0
         for path in paths:
             try:
-                manifests.append(load_manifest(path))
+                manifests.append(load_manifest(path, root=args.root))
             except ManifestError:
                 print(f"{path.name} warning — invalid package manifest", file=sys.stderr)
                 failed_manifests += 1

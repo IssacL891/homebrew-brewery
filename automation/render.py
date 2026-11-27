@@ -8,7 +8,7 @@ import sys
 if __package__ in (None, ""):
     sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
-from automation.manifests import Manifest, ManifestError, load_manifest
+from automation.manifests import Manifest, ManifestError, load_manifest, manifest_paths
 
 
 MARKER = "# Generated from "
@@ -124,7 +124,7 @@ def render_manifest(manifest: Manifest) -> dict[Path, str]:
     for channel, release in data["channels"].items():
         token = f"{base}-pre" if channel == "pre" else base
         sibling = (base if channel == "pre" else f"{base}-pre") if paired else None
-        output = Path(OUTPUT_DIRS[data["kind"]]) / data.get("directory", "") / f"{token}.rb"
+        output = Path(OUTPUT_DIRS[data["kind"]]) / manifest.output_directory / f"{token}.rb"
         if data["kind"] == "cask":
             body = render_cask(data, token, release, sibling)
         else:
@@ -139,11 +139,13 @@ def render_tree(root: Path, check: bool) -> list[Path]:
     outputs = {}
     claimed = set()
     errors = []
-    for path in sorted((root / "packages").glob("*/*.yaml")):
-        for output, content in render_manifest(load_manifest(path)).items():
-            if str(output).casefold() in claimed:
-                raise ManifestError(f"duplicate output: {output}")
-            claimed.add(str(output).casefold())
+    for path in manifest_paths(root):
+        manifest = load_manifest(path, root=root)
+        for output, content in render_manifest(manifest).items():
+            identity = manifest.data["kind"], output.stem
+            if identity in claimed:
+                raise ManifestError(f"duplicate output token: {output.stem} ({output})")
+            claimed.add(identity)
             outputs[output] = content
 
     for output, content in outputs.items():

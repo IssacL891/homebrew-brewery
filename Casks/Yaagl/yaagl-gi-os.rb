@@ -1,4 +1,4 @@
-# Generated from packages/casks/yaagl-gi-os.yaml. Edit the YAML and regenerate.
+# Generated from packages/casks/Yaagl/yaagl-gi-os.yaml. Edit the YAML and regenerate.
 
 cask "yaagl-gi-os" do
   version "0.4.0"

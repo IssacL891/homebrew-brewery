@@ -21,6 +21,13 @@ class Manifest:
     root: Path
     data: dict
 
+    @property
+    def output_directory(self) -> Path:
+        if "directory" in self.data:
+            return Path(self.data["directory"])
+        kind_dir = self.root / "packages" / MANIFEST_DIRS[self.data["kind"]]
+        return self.path.parent.relative_to(kind_dir)
+
     def resolve_recipe(self, path: str) -> Path:
         recipe = (self.root / path).resolve()
         if not recipe.is_relative_to(self.root / "recipes") or not recipe.is_file():
@@ -211,7 +218,7 @@ def validate_manifest(manifest: Manifest) -> None:
     token = data.get("token")
     if not isinstance(token, str) or not TOKEN.fullmatch(token) or manifest.path.stem != token:
         raise ManifestError("token must match the manifest filename")
-    if manifest.path.parent != manifest.root / "packages" / MANIFEST_DIRS[kind]:
+    if not manifest.path.is_relative_to(manifest.root / "packages" / MANIFEST_DIRS[kind]):
         raise ManifestError("manifest directory must match its kind")
     if "directory" in data:
         validate_relative_path(data["directory"], "directory")
@@ -262,17 +269,36 @@ def validate_manifest(manifest: Manifest) -> None:
             validate_string_list(data["depends_on"], "depends_on")
 
 
-def load_manifest(path: Path) -> Manifest:
+def is_manifest_path(path: Path) -> bool:
+    parts = path.parts
+    return len(parts) >= 3 and parts[0] == "packages" and parts[1] in MANIFEST_DIRS.values() and path.suffix == ".yaml"
+
+
+def manifest_paths(root: Path) -> list[Path]:
+    return sorted(path for name in MANIFEST_DIRS.values() for path in (root / "packages" / name).rglob("*.yaml"))
+
+
+def load_manifest(path: Path, *, root: Path | None = None) -> Manifest:
     if path.is_symlink():
         raise ManifestError(f"{path}: a manifest must be a regular file")
     path = path.resolve()
+    if root is None:
+        root = next(
+            (parent.parent for parent in path.parents
+             if parent.name == "packages" and is_manifest_path(path.relative_to(parent.parent))),
+            None,
+        )
+    else:
+        root = root.resolve()
+    if root is None or not path.is_relative_to(root) or not is_manifest_path(path.relative_to(root)):
+        raise ManifestError(f"{path}: expected a YAML manifest under packages/casks or packages/formulae")
     try:
         source = path.read_text(encoding="utf-8")
         for token in yaml_parser().scan(source):
             if isinstance(token, (AliasToken, AnchorToken, TagToken)):
                 raise ManifestError("YAML anchors, aliases and tags are unsupported")
         data = yaml_parser().load(source)
-        manifest = Manifest(path, path.parent.parent.parent.resolve(), data)
+        manifest = Manifest(path, root, data)
         validate_manifest(manifest)
         return manifest
     except (YAMLError, OSError, ValueError) as exc:
