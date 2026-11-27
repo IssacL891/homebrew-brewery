@@ -118,3 +118,4 @@ build-iPhoneSimulator/
 # Local package automation
 .venv/
 __pycache__/
+/.superpowers/
