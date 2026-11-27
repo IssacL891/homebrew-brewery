@@ -13,6 +13,10 @@ macos: true
 app: Yaagl HSR OS.app
 zap:
   - ~/Library/Application Support/Yaagl HSR OS
+upstream:
+  repository: yaagl/yet-another-anime-game-launcher
+  assets:
+    universal: Yaagl.HSR.OS.app.tar.gz
 channels:
   stable:
     version: "0.4.0"

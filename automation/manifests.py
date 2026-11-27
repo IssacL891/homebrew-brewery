@@ -32,7 +32,7 @@ TOKEN = re.compile(r"[a-z0-9]+(?:-[a-z0-9]+)*\Z")
 VERSION = re.compile(r"[a-zA-Z0-9][a-zA-Z0-9.+,_-]*\Z")
 SHA256 = re.compile(r"[a-f0-9]{64}\Z")
 PLACEHOLDER = re.compile(r"\{([^{}]*)\}")
-COMMON_KEYS = {"schema", "kind", "token", "directory", "desc", "homepage", "url", "channels", "livecheck"}
+COMMON_KEYS = {"schema", "kind", "token", "directory", "desc", "homepage", "url", "channels", "livecheck", "upstream"}
 CASK_KEYS = {"name", "macos", "arch", "app", "zap"}
 FORMULA_KEYS = {"recipe", "patch", "license", "depends_on"}
 MANIFEST_DIRS = {"cask": "casks", "formula": "formulae"}
@@ -104,6 +104,33 @@ def validate_release(release, channel: str, fallback_url: str | None) -> None:
         raise ManifestError(f"{channel}.tag is required by the URL template")
 
 
+def validate_upstream(policy) -> None:
+    validate_mapping(policy, {"repository", "tag_prefix", "tag_pattern", "assets", "fallback"}, "upstream")
+    repository = policy.get("repository")
+    if not isinstance(repository, str) or not re.fullmatch(r"[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+", repository):
+        raise ManifestError("upstream.repository must be a GitHub owner/repo")
+    assets = policy.get("assets")
+    validate_mapping(assets, {"universal", "arm64", "x86_64"}, "upstream.assets")
+    if not assets or ("universal" in assets and len(assets) != 1):
+        raise ManifestError("upstream.assets needs a universal asset or explicit architecture assets")
+    for name in assets.values():
+        validate_string(name, "upstream asset")
+        if "/" in name or "\\" in name or any(key not in {"tag", "version"} for key in PLACEHOLDER.findall(name)):
+            raise ManifestError("upstream asset name must use only tag or version placeholders")
+        if any(brace in PLACEHOLDER.sub("", name) for brace in "{}"):
+            raise ManifestError("upstream asset name has unexpected braces")
+    if "fallback" in policy and type(policy["fallback"]) is not bool:
+        raise ManifestError("upstream.fallback must be a boolean")
+    if "tag_prefix" in policy:
+        validate_string(policy["tag_prefix"], "upstream.tag_prefix")
+    if "tag_pattern" in policy:
+        validate_string(policy["tag_pattern"], "upstream.tag_pattern")
+        try:
+            re.compile(policy["tag_pattern"])
+        except re.error as exc:
+            raise ManifestError(f"invalid upstream.tag_pattern: {exc}") from exc
+
+
 def validate_manifest(manifest: Manifest) -> None:
     data = manifest.data
     if not isinstance(data, dict) or type(data.get("schema")) is not int or data["schema"] != 1:
@@ -130,6 +157,9 @@ def validate_manifest(manifest: Manifest) -> None:
         raise ManifestError("channels.stable is required")
     for channel, release in channels.items():
         validate_release(release, channel, data.get("url"))
+
+    if "upstream" in data:
+        validate_upstream(data["upstream"])
 
     if "livecheck" in data:
         livecheck = data["livecheck"]

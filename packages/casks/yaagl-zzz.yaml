@@ -13,6 +13,10 @@ macos: true
 app: Yaagl ZZZ.app
 zap:
   - ~/Library/Application Support/Yaagl ZZZ
+upstream:
+  repository: yaagl/yet-another-anime-game-launcher
+  assets:
+    universal: Yaagl.ZZZ.app.tar.gz
 channels:
   stable:
     version: "0.4.1-alpha"

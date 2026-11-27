@@ -11,6 +11,13 @@ livecheck:
   strategy: git
 macos: true
 app: Dartotsu.app
+upstream:
+  repository: aayush2622/Dartotsu
+  tag_prefix: v
+  tag_pattern: v\d+\.\d+\.\d+
+  assets:
+    universal: Dartotsu-macos-{tag}.dmg
+  fallback: true
 channels:
   stable:
     version: "1.0.0"
