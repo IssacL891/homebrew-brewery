@@ -21,19 +21,35 @@ brew "<formula>"
 
 Edit the YAML for a managed package in `packages/casks/` or `packages/formulae/`. Generate the Homebrew definitions and commit the YAML and generated Ruby together.
 
-Cask YAML files are grouped by category under `packages/casks/`. To add a cask, copy a similar manifest into its category, give it a unique filename and matching token, and update the download and app fields. [Example cask](../packages/casks/Godot/godot-launcher.yaml)
+Cask YAML files are grouped by category under `packages/casks/`. The generator mirrors the category under `Casks/`. For example, `packages/casks/Manga Readers/dartotsu.yaml` generates `Casks/Manga Readers/dartotsu.rb`. Keep stable and prerelease settings for the same package in that package’s YAML file.
 
-The generator mirrors the category under `Casks/`. For example, `packages/casks/Manga Readers/dartotsu.yaml` generates `Casks/Manga Readers/dartotsu.rb`. Keep stable and prerelease settings for the same package in that package’s YAML file.
+Set up the local Python environment once.
 
 ```sh
 python3 -m venv .venv
 .venv/bin/python -m pip install -r automation/requirements.txt
+```
+
+### Start a package from a template
+
+Run the Brewery CLI from the repository root to create a draft YAML with comments explaining the blank fields.
+
+```sh
+.venv/bin/python automation/brewery.py new cask my-app --category "Daily Tools/Apps" --write
+.venv/bin/python automation/brewery.py new formula my-tool --write
+```
+
+The cask command creates `packages/casks/Daily Tools/Apps/my-app.yaml` and its category if needed. Leave off `--write` to preview the YAML in the terminal. Add `--pre` to include a prerelease channel and fields for tracking GitHub release assets. A formula template includes the path to its Ruby build recipe. For more cask fields, see the [Godot Launcher manifest](../packages/casks/Godot/godot-launcher.yaml).
+
+Fill in the blank fields, then generate and check the Homebrew definitions.
+
+```sh
 .venv/bin/python automation/render.py
 .venv/bin/python automation/render.py --check
 .venv/bin/python -m unittest discover -s tests -v
 ```
 
-A standard manifest uses `schema: 1`. Existing manifests with an explicit `directory` continue to use it as their output location under `Casks/` or `Formula/`. Set the version and SHA-256 under `channels.stable` or `channels.pre`. The shared `url` supports `{version}` and `{tag}`. A channel can provide an exact URL instead. Defining both channels generates the plain token and its `-pre` counterpart with reciprocal conflicts.
+A standard manifest uses `schema: 1`. Existing manifests with an explicit `directory` continue to use it as their output location under `Casks/` or `Formula/`. Set the version and SHA-256 under `channels.stable` or `channels.pre`. The shared `url` supports `{version}` and `{tag}`. If it uses `{tag}`, add a `tag` value to each channel that uses the shared URL. A channel can provide an exact URL instead. Defining both channels generates the plain token and its `-pre` counterpart with reciprocal conflicts.
 
 Cask manifests declare the app bundle, macOS or architecture requirements, livecheck strategy, and cleanup paths. Formula manifests reference reviewed Ruby build and test code in `recipes/`. An optional patch is embedded with the recipe so the result works as standalone Homebrew Ruby. The existing `libsoil` formula stays manually maintained.
 
