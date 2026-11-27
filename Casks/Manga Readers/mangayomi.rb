@@ -1,3 +1,5 @@
+# Generated from packages/casks/Manga Readers/mangayomi.yaml. Edit the YAML and regenerate.
+
 cask "mangayomi" do
   version "0.9.97"
   sha256 "f857c872d768d86d61728cbd03bf7df97a6e42a29acede255063227913ee341b"

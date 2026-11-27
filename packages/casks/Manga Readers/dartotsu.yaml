@@ -1,0 +1,23 @@
+schema: 1
+kind: cask
+token: dartotsu
+name: Dartotsu
+desc: Complete rewrite of Dantotsu in Flutter
+homepage: https://github.com/aayush2622/Dartotsu
+url: https://github.com/aayush2622/Dartotsu/releases/download/v{version}/Dartotsu-macos-v{version}.dmg
+livecheck:
+  url: url
+  strategy: git
+macos: true
+app: Dartotsu.app
+upstream:
+  repository: aayush2622/Dartotsu
+  tag_prefix: v
+  tag_pattern: v\d+\.\d+\.\d+
+  assets:
+    universal: Dartotsu-macos-{tag}.dmg
+  fallback: true
+channels:
+  stable:
+    version: "1.0.0"
+    sha256: "6da82a5767db52da522d18260b87e887b3516ce9d8a9266c7b7b89f484fb22fa"

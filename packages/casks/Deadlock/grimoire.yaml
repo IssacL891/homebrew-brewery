@@ -1,0 +1,17 @@
+schema: 1
+kind: cask
+token: grimoire
+name: Grimoire
+desc: Mod manager and companion tool for Deadlock
+homepage: https://github.com/Slush97/grimoire
+url: https://github.com/Slush97/grimoire/releases/download/v{version}/Grimoire-{version}-arm64.dmg
+livecheck:
+  url: url
+  strategy: github_latest
+macos: true
+app: Grimoire.app
+arch: arm64
+channels:
+  stable:
+    version: "1.35.1"
+    sha256: "ed5f21ed7ad6712b1ced648174d2157e0d8777b795a65a312ccb92154ca29648"

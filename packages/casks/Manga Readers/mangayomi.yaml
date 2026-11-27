@@ -1,0 +1,16 @@
+schema: 1
+kind: cask
+token: mangayomi
+name: mangayomi
+desc: Free and open source application for reading manga, novels, and watching anime
+homepage: https://github.com/kodjodevf/mangayomi
+url: https://github.com/kodjodevf/mangayomi/releases/download/v{version}/Mangayomi-v{version}-macos.dmg
+livecheck:
+  url: url
+  strategy: git
+macos: true
+app: Mangayomi.app
+channels:
+  stable:
+    version: "0.9.97"
+    sha256: "f857c872d768d86d61728cbd03bf7df97a6e42a29acede255063227913ee341b"

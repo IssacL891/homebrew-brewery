@@ -1,6 +1,8 @@
+# Generated from packages/casks/Yaagl/yaagl-hsr.yaml. Edit the YAML and regenerate.
+
 cask "yaagl-hsr" do
-  version "0.4.1-alpha"
-  sha256 "c293e5a5a759246ed9ffa7fb97665b9b061c45adb1912ed81ded0305fdecc74b"
+  version "0.4.0"
+  sha256 "1f3d3ca8d7b0d7d340d9dd79e0d3a33e0386f022fecaa75dfe1b9d2becbfac6e"
 
   url "https://github.com/yaagl/yet-another-anime-game-launcher/releases/download/#{version}/Yaagl.HSR.app.tar.gz"
   name "Yet Another Anime Game Launcher"
@@ -11,6 +13,8 @@ cask "yaagl-hsr" do
     url :url
     strategy :git
   end
+
+  conflicts_with cask: "yaagl-hsr-pre"
 
   depends_on :macos
 

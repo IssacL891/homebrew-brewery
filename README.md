@@ -1,18 +1,14 @@
 # IssacL891 Brewery
 
-## How do I install these formulae?
+A Homebrew tap for custom casks and formulae.
 
-`brew install issacl891/brewery/<formula>`
-
-Or `brew tap issacl891/brewery` and then `brew install <formula>`.
-
-Or, in a `brew bundle` `Brewfile`:
-
-```ruby
-tap "issacl891/brewery"
-brew "<formula>"
+```sh
+brew tap issacl891/brewery
+brew install --cask issacl891/brewery/godot-launcher
 ```
 
-## Documentation
+Install a formula with `brew install issacl891/brewery/<formula>`.
 
-`brew help`, `man brew` or check [Homebrew's documentation](https://docs.brew.sh).
+- [Package setup and YAML format](docs/packages.md)
+- [Yaagl stable and prerelease channels](docs/yaagl.md)
+- [Update automation, notifications, and rollout](docs/automation.md)

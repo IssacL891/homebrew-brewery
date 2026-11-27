@@ -1,6 +1,8 @@
+# Generated from packages/casks/Yaagl/yaagl-gi-os.yaml. Edit the YAML and regenerate.
+
 cask "yaagl-gi-os" do
-  version "0.4.1-alpha"
-  sha256 "61f86caef043fe8cbf1438d207092392c6aa5ddff6688a853afcf8dc0318302d"
+  version "0.4.0"
+  sha256 "1c7a9c41e0b7d26eb0c776cd9f70ee41920a5bb05749fd24d84224a71a00b89b"
 
   url "https://github.com/yaagl/yet-another-anime-game-launcher/releases/download/#{version}/Yaagl.OS.app.tar.gz"
   name "Yet Another Anime Game Launcher"
@@ -11,6 +13,8 @@ cask "yaagl-gi-os" do
     url :url
     strategy :git
   end
+
+  conflicts_with cask: "yaagl-gi-os-pre"
 
   depends_on :macos
 

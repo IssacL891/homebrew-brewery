@@ -1,0 +1,88 @@
+name: Brewery package validation
+
+on:
+  pull_request:
+    branches: [main]
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  package-validation:
+    runs-on: macos-latest
+    timeout-minutes: 25
+    env:
+      HOMEBREW_NO_AUTO_UPDATE: "1"
+      HOMEBREW_NO_ANALYTICS: "1"
+      PYTHONDONTWRITEBYTECODE: "1"
+      APP_BUMP: ${{ github.event_name == 'pull_request' && vars.BREWERY_APP_BOT != '' && github.event.pull_request.user.login == vars.BREWERY_APP_BOT && github.event.pull_request.head.repo.full_name == github.repository && startsWith(github.head_ref, 'brewery-bump/') }}
+    steps:
+      - name: Check out the test merge
+        if: ${{ !env.ACT }}
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Check out the trusted generator
+        if: ${{ !env.ACT && env.APP_BUMP == 'true' }}
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          ref: ${{ github.event.pull_request.base.sha }}
+          path: .brewery-base
+          persist-credentials: false
+
+      - name: Set up Python
+        if: ${{ !env.ACT }}
+        uses: actions/setup-python@a309ff8b426b58ec0e2a45f0f869d46889d02405 # v6.2.0
+        with:
+          python-version: "3.12"
+
+      - name: Test generated packages
+        if: ${{ !env.ACT && env.APP_BUMP != 'true' }}
+        run: |
+          python -m pip install -r automation/requirements.txt
+          python automation/render.py --check
+          python -m unittest discover -s tests -v
+          find Casks Formula -name '*.rb' -print0 | xargs -0 -n1 ruby -c
+
+      - name: Validate an app-created bump
+        if: ${{ !env.ACT && env.APP_BUMP == 'true' }}
+        env:
+          GH_TOKEN: ${{ github.token }}
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+          BUMP_BRANCH: ${{ github.head_ref }}
+          BREWERY_APP_BOT: ${{ vars.BREWERY_APP_BOT }}
+          TAP: ${{ github.repository_owner }}/brewery
+        run: |
+          python -m pip install -r .brewery-base/automation/requirements.txt
+          brew tap --custom-remote "$TAP" "$GITHUB_WORKSPACE/.brewery-base"
+          brew trust --tap "$TAP"
+          python .brewery-base/automation/pr_validation.py --root "$GITHUB_WORKSPACE" \
+            --base "$BASE_SHA" --head "$HEAD_SHA" --branch "$BUMP_BRANCH"
+          if [[ "$BUMP_BRANCH" == brewery-bump/formula/* ]]; then
+            token="${BUMP_BRANCH#brewery-bump/formula/}"
+            formula="$TAP/${token%%/*}"
+            brew untap "$TAP"
+            brew tap --custom-remote "$TAP" "$GITHUB_WORKSPACE"
+            brew trust --tap "$TAP"
+            brew install --formula --build-from-source "$formula"
+            has_test=$(brew ruby -e 'require "formulary"; puts Formulary.factory(ARGV.fetch(0)).test_defined?' "$formula")
+            if [[ "$has_test" == true ]]; then
+              brew test "$formula"
+            fi
+          fi
+
+      - name: Exercise package checks on the local runner
+        if: ${{ env.ACT }}
+        working-directory: ${{ vars.BREWERY_FIXTURE_ROOT }}
+        env:
+          FIXTURE_PYTHON: ${{ vars.BREWERY_FIXTURE_PYTHON }}
+        run: |
+          test "$(uname -s)" = Darwin
+          "${FIXTURE_PYTHON:-python3}" automation/render.py --check
+          "${FIXTURE_PYTHON:-python3}" -m unittest discover -s tests -v
