@@ -1,3 +1,5 @@
+# Generated from packages/casks/yaagl-hsr.yaml. Edit the YAML and regenerate.
+
 cask "yaagl-hsr" do
   version "0.4.1-alpha"
   sha256 "c293e5a5a759246ed9ffa7fb97665b9b061c45adb1912ed81ded0305fdecc74b"

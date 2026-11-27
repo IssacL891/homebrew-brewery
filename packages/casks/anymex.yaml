@@ -1,0 +1,17 @@
+schema: 1
+kind: cask
+token: anymex
+directory: Manga Readers
+name: AnymeX
+desc: Multiservice tracking client for anime and managa progress
+homepage: https://github.com/RyanYuuki/AnymeX
+url: https://github.com/RyanYuuki/AnymeX/releases/download/v{version}/AnymeX.dmg
+livecheck:
+  url: url
+  strategy: github_latest
+macos: true
+app: AnymeX.app
+channels:
+  stable:
+    version: "3.2.1"
+    sha256: "cc1e722cac6fdd66142343aaa10fe26e0d08349e02362825dc03b75cd90515bf"

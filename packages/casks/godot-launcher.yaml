@@ -1,0 +1,17 @@
+schema: 1
+kind: cask
+token: godot-launcher
+directory: Godot
+name: godot-launcher
+desc: Open-source launcher for Godot game development
+homepage: https://github.com/godotlauncher/launcher
+url: https://github.com/godotlauncher/launcher/releases/download/v{version}/Godot_Launcher-{version}-mac_universal.dmg
+livecheck:
+  url: url
+  strategy: github_latest
+macos: true
+app: Godot Launcher.app
+channels:
+  stable:
+    version: "1.14.0"
+    sha256: "5ba1dc3c8788290a75c2da5c3f352593c7ca287caeec98d703f2ad38ddf247b3"

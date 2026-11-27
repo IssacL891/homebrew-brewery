@@ -1,0 +1,19 @@
+schema: 1
+kind: cask
+token: yaagl-hsr-os
+directory: Yaagl
+name: Yet Another Anime Game Launcher
+desc: Launcher for an anime game overseas
+homepage: https://github.com/yaagl/yet-another-anime-game-launcher
+url: https://github.com/yaagl/yet-another-anime-game-launcher/releases/download/{version}/Yaagl.HSR.OS.app.tar.gz
+livecheck:
+  url: url
+  strategy: git
+macos: true
+app: Yaagl HSR OS.app
+zap:
+  - ~/Library/Application Support/Yaagl HSR OS
+channels:
+  stable:
+    version: "0.4.0"
+    sha256: "ce71055e881db9ccbbbab7b9804f754b7187a779bc5ab3556480c56cf00f30d4"

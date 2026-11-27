@@ -1,3 +1,5 @@
+# Generated from packages/casks/goofcord.yaml. Edit the YAML and regenerate.
+
 cask "goofcord" do
   version "2.3.1"
   sha256 "4f333711ff5e836bea2fd944e455a25e66b8abcb6df74c73b7de5177e71f57dd"

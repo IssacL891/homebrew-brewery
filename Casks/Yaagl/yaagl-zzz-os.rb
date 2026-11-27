@@ -1,3 +1,5 @@
+# Generated from packages/casks/yaagl-zzz-os.yaml. Edit the YAML and regenerate.
+
 cask "yaagl-zzz-os" do
   version "0.4.1-alpha"
   sha256 "0274636ab279558aea54790947fbc5b2cfff4a8c21c1d4c75be899b721dbc50c"

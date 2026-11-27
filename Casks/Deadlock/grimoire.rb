@@ -1,3 +1,5 @@
+# Generated from packages/casks/grimoire.yaml. Edit the YAML and regenerate.
+
 cask "grimoire" do
   version "1.35.1"
   sha256 "ed5f21ed7ad6712b1ced648174d2157e0d8777b795a65a312ccb92154ca29648"

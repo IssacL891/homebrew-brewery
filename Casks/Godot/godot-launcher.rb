@@ -1,3 +1,5 @@
+# Generated from packages/casks/godot-launcher.yaml. Edit the YAML and regenerate.
+
 cask "godot-launcher" do
   version "1.14.0"
   sha256 "5ba1dc3c8788290a75c2da5c3f352593c7ca287caeec98d703f2ad38ddf247b3"

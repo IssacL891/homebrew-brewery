@@ -1,0 +1,19 @@
+schema: 1
+kind: cask
+token: yaagl-zzz-os
+directory: Yaagl
+name: Yet Another Anime Game Launcher
+desc: Launcher for an anime game overseas
+homepage: https://github.com/yaagl/yet-another-anime-game-launcher
+url: https://github.com/yaagl/yet-another-anime-game-launcher/releases/download/{version}/Yaagl.ZZZ.OS.app.tar.gz
+livecheck:
+  url: url
+  strategy: git
+macos: true
+app: Yaagl ZZZ OS.app
+zap:
+  - ~/Library/Application Support/Yaagl ZZZ OS
+channels:
+  stable:
+    version: "0.4.1-alpha"
+    sha256: "0274636ab279558aea54790947fbc5b2cfff4a8c21c1d4c75be899b721dbc50c"

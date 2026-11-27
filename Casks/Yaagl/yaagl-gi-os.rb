@@ -1,3 +1,5 @@
+# Generated from packages/casks/yaagl-gi-os.yaml. Edit the YAML and regenerate.
+
 cask "yaagl-gi-os" do
   version "0.4.1-alpha"
   sha256 "61f86caef043fe8cbf1438d207092392c6aa5ddff6688a853afcf8dc0318302d"
