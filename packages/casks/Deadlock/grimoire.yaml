@@ -11,6 +11,12 @@ livecheck:
 macos: true
 app: Grimoire.app
 arch: arm64
+upstream:
+  repository: Slush97/grimoire
+  tag_prefix: v
+  tag_pattern: v\d+\.\d+\.\d+
+  assets:
+    arm64: Grimoire-{version}-arm64.dmg
 channels:
   stable:
     version: "1.35.1"

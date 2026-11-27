@@ -10,6 +10,12 @@ livecheck:
   strategy: github_latest
 macos: true
 app: AnymeX.app
+upstream:
+  repository: RyanYuuki/AnymeX
+  tag_prefix: v
+  tag_pattern: v\d+\.\d+\.\d+
+  assets:
+    universal: AnymeX.dmg
 channels:
   stable:
     version: "3.2.1"

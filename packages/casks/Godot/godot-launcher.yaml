@@ -10,6 +10,12 @@ livecheck:
   strategy: github_latest
 macos: true
 app: Godot Launcher.app
+upstream:
+  repository: godotlauncher/launcher
+  tag_prefix: v
+  tag_pattern: v\d+\.\d+\.\d+
+  assets:
+    universal: Godot_Launcher-{version}-mac_universal.dmg
 channels:
   stable:
     version: "1.14.0"
