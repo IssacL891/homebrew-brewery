@@ -1,6 +1,7 @@
 import hashlib
 import hmac
 import json
+from http.client import BadStatusLine
 from pathlib import Path
 import tempfile
 import unittest
@@ -59,6 +60,27 @@ class NotificationsTests(unittest.TestCase):
         notifications.report_failures(api, {PACKAGE: REASON}, RUN, deliver)
         self.assertEqual(len(api.issues), 2)
 
+    def test_changed_reason_closes_superseded_issue_then_recovers(self):
+        api, deliver = IssueApi(), Mock()
+        notifications.report_failures(api, {PACKAGE: REASON}, RUN, deliver)
+        notifications.report_failures(api, {PACKAGE: "download_failed"}, RUN, deliver)
+        self.assertEqual(api.issues[0]["state"], "closed")
+        self.assertEqual(api.issues[0]["state_reason"], "not_planned")
+        self.assertEqual(api.issues[1]["state"], "open")
+        notifications.report_failures(api, {PACKAGE: None}, RUN, deliver)
+        self.assertEqual(api.issues[1]["state"], "closed")
+        self.assertEqual(api.issues[1]["state_reason"], "completed")
+
+    def test_bad_http_response_does_not_block_other_issues(self):
+        api, deliver = IssueApi(), Mock(side_effect=[BadStatusLine("sensitive"), None])
+        with self.assertLogs("automation.notifications", level="WARNING") as log:
+            notifications.report_failures(api, {PACKAGE: REASON, "workflow:publish": "workflow_blocked"},
+                                          RUN, deliver)
+        self.assertNotIn("sensitive", str(log.output))
+        self.assertEqual(deliver.call_count, 2)
+        self.assertEqual(api.issues[0]["comments"], [])
+        self.assertEqual(len(api.issues[1]["comments"]), 1)
+
     def test_retries_dispatch_without_creating_a_new_issue(self):
         api, deliver = IssueApi(), Mock(side_effect=[OSError("sensitive URL"), None])
         with self.assertLogs("automation.notifications", level="WARNING") as log:
@@ -93,6 +115,36 @@ class NotificationsTests(unittest.TestCase):
                 notifications.observations_from_reports(scan, publish, "success", "failure"),
                 {"workflow:scan": None, PACKAGE: REASON, "workflow:publish": "workflow_blocked"},
             )
+
+    def test_cancelled_jobs_and_skipped_publishes_leave_prior_state_unobserved(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            scan = Path(temporary) / "scan.json"
+            publish = Path(temporary) / "publish.json"
+            publish.write_text(json.dumps([{
+                "kind": "cask", "token": "dartotsu", "status": "skipped",
+                "message": "pending candidate in PR #123",
+            }]))
+            self.assertEqual(notifications.observations_from_reports(scan, publish, "cancelled", "success"),
+                             {"workflow:publish": None})
+
+    def test_cli_opens_issue_and_warns_when_t3_is_unconfigured(self):
+        api = IssueApi()
+        with tempfile.TemporaryDirectory() as temporary:
+            scan = Path(temporary) / "scan.json"
+            publish = Path(temporary) / "publish.json"
+            env = {"GITHUB_REPOSITORY": REPO, "BREWERY_APP_BOT": APP, "GITHUB_RUN_ID": "123",
+                   "SCAN_STATUS": "failure", "PUBLISH_STATUS": "skipped"}
+            with (
+                patch.dict("os.environ", env, clear=True),
+                patch("sys.argv", ["notifications.py", "--scan", str(scan), "--publish", str(publish)]),
+                patch.object(notifications, "GitHub", return_value=api),
+                self.assertLogs("automation.notifications", level="WARNING") as log,
+            ):
+                self.assertEqual(notifications.main(), 0)
+        self.assertIn("no recorded T3 receipt", log.output[0])
+        self.assertEqual(len(api.issues), 1)
+        self.assertIn(RUN, api.issues[0]["body"])
+        self.assertEqual(api.issues[0]["comments"], [])
 
     def test_dispatch_signs_minimal_json_and_checks_receipt(self):
         response = Mock(status=202, headers={"X-T3-Hook-Outcome": "accepted"})

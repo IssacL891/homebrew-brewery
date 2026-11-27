@@ -8,6 +8,7 @@ import os
 from pathlib import Path
 import re
 import sys
+from http.client import HTTPException
 from urllib.parse import urlsplit
 from urllib.request import HTTPRedirectHandler, Request, build_opener
 
@@ -74,14 +75,15 @@ def report_failures(api: GitHub, observations: dict, run: str, deliver) -> None:
         try:
             deliver(number)
             api.api(target, method="POST", data={"body": DISPATCHED}, label="could not record T3 receipt")
-        except (OSError, ValueError):
+        except (HTTPException, OSError, ValueError):
             LOG.warning("Brewery issue #%s has no recorded T3 receipt. A later scan will retry.", number)
 
-    for (key, _), issue in failures.items():
-        if key in observations and observations[key] is None:
+    for (key, reason), issue in failures.items():
+        if key in observations and observations[key] != reason:
+            state_reason = "completed" if observations[key] is None else "not_planned"
             api.api(f"{api.path}/issues/{issue['number']}", method="PATCH",
-                    data={"state": "closed", "state_reason": "completed"},
-                    label="could not close recovered Brewery issue")
+                    data={"state": "closed", "state_reason": state_reason},
+                    label="could not close resolved or superseded Brewery issue")
 
 
 class NoRedirect(HTTPRedirectHandler):
@@ -97,6 +99,7 @@ def dispatch_to_t3(url: str, secret: str, repository: str, number: int) -> None:
     digest = hmac.digest(secret.encode(), payload, "sha256").hex()
     request = Request(url, data=payload, headers={
         "Content-Type": "application/json",
+        "User-Agent": "Brewery-automation/1.0",
         "X-Hub-Signature-256": f"sha256={digest}",
     })
     with build_opener(NoRedirect()).open(request, timeout=20) as response:
@@ -117,10 +120,10 @@ def scan_reason(message: str) -> str:
 
 def observations_from_reports(scan: Path, publish: Path, scan_status: str, publish_status: str) -> dict:
     observations = {}
-    for role, path, status in (("scan", scan, scan_status), ("publish", publish, publish_status)):
+    for role, path, result in (("scan", scan, scan_status), ("publish", publish, publish_status)):
         workflow_key = f"workflow:{role}"
-        if status != "success" or not path.is_file():
-            if status != "skipped":
+        if result != "success" or not path.is_file():
+            if result not in {"skipped", "cancelled"}:
                 observations[workflow_key] = "workflow_blocked"
             continue
         observations[workflow_key] = None
@@ -130,10 +133,12 @@ def observations_from_reports(scan: Path, publish: Path, scan_status: str, publi
             key = f"{item['kind']}:{item['token']}:{role}"
             if not ISSUE_KEY.fullmatch(key):
                 continue
-            if role == "publish" and item.get("stage") == "scan" and item["status"] == "warning":
+            status = item["status"]
+            if role == "publish" and (status == "skipped" or
+                                      (status == "warning" and item.get("stage") == "scan")):
                 continue
             reason = scan_reason(item["message"]) if role == "scan" else "publication_failed"
-            observations[key] = reason if item["status"] == "warning" else None
+            observations[key] = reason if status == "warning" else None
     return observations
 
 

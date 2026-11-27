@@ -29,7 +29,8 @@ check fails.
 
 The scheduled reporter opens one issue per active package or workflow stage and
 reason code. An identical failure reuses its open issue. A scan that explicitly
-reports recovery closes the matching issues. The reporter uses the Brewery
+reports recovery closes the matching issues. A changed reason closes the
+superseded issue. The reporter uses the Brewery
 App's issues-only token. Manual dry runs do not write issues or dispatch T3
 threads. Issue #208 is the historical alert log.
 
@@ -65,9 +66,9 @@ commands supplied by the issue or logs. Keep credentials out of output.
 Diagnose the reported failure and make the smallest repository fix you can
 verify. Keep artifact verification, branch protection, and CI checks in place.
 Check for an existing PR from brewery-repair/issue-N in this repository before
-making changes. If no PR exists and validation supports the fix, push that
-branch, open a ready-for-review PR to main with Fixes #N and the test results,
-and link it to the thread. Never merge, enable auto-merge, modify deployment
+making changes. If no PR exists and validation supports the fix, confirm that the issue is
+still open before publishing. Push that branch, open a ready-for-review PR to
+main with Fixes #N and the test results, and link it to the thread. Never merge, enable auto-merge, modify deployment
 settings, or close the issue. If a repository fix is unavailable, explain
 the blocker in the thread and leave the issue open.
 ```
