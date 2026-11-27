@@ -1,6 +1,8 @@
 name: Brewery package bumps
 
 on:
+  push:
+    branches: [brewery/upstream-smoke]
   schedule:
     - cron: "0 4,16 * * *"
   workflow_dispatch:
