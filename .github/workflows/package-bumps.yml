@@ -126,7 +126,8 @@ jobs:
           BREWERY_APP_BOT: ${{ vars.BREWERY_APP_BOT }}
           APP_SLUG: ${{ steps.app.outputs.app-slug }}
         run: |
-          test -n "$APP_SLUG" && test "$BREWERY_APP_BOT" = "${APP_SLUG}[bot]"
+          test -n "$APP_SLUG"
+          test "$BREWERY_APP_BOT" = "${APP_SLUG}[bot]"
           python automation/publish.py "$RUNNER_TEMP/brewery/brewery-scan.json" \
             --output "$RUNNER_TEMP/brewery-publish.json"
 
@@ -202,7 +203,8 @@ jobs:
           SCAN_STATUS: ${{ needs.scan.result }}
           PUBLISH_STATUS: ${{ needs.publish.result }}
         run: |
-          test -n "$APP_SLUG" && test "$BREWERY_APP_BOT" = "${APP_SLUG}[bot]"
+          test -n "$APP_SLUG"
+          test "$BREWERY_APP_BOT" = "${APP_SLUG}[bot]"
           python automation/notifications.py --scan "$RUNNER_TEMP/brewery/brewery-scan.json" \
             --publish "$RUNNER_TEMP/brewery/brewery-publish.json"
 
