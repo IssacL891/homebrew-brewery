@@ -16,7 +16,7 @@ from urllib.parse import quote, unquote
 import zipfile
 
 from automation.manifests import SHA256
-from automation.package_diff import candidate_digests, checksum_download, prepare_bump
+from automation.package_diff import checksum_download, prepare_bump
 from automation.releases import ReleaseError, github_releases, read_json
 
 
@@ -39,8 +39,10 @@ def digest_file(path: Path) -> str:
         return hashlib.file_digest(handle, "sha256").hexdigest()
 
 
-def release_identity(kind: str, token: str, channel: str, version: str, revision: str, recipe: str) -> str:
-    key = json.dumps([kind, token, channel, version, revision, recipe], separators=(",", ":"))
+def release_identity(
+    kind: str, token: str, channel: str, version: str, revision: str, recipe: str, targets: tuple[str, ...] = (),
+) -> str:
+    key = json.dumps([kind, token, channel, version, revision, recipe, sorted(targets)], separators=(",", ":"))
     return f"brewery-build-{kind}-{token}-{channel}-{hashlib.sha256(key.encode()).hexdigest()[:24]}"
 
 
@@ -94,8 +96,8 @@ def inspect_app_zip(path: Path, bundle: str, target: str, signing: str) -> None:
             if signing in {"signed", "notarized"}:
                 command(["codesign", "--verify", "--deep", "--strict", str(app)], root, 60)
             if signing == "notarized":
-                command(["spctl", "--assess", "--type", "execute", str(app)], root, 60)
-        except (OSError, ValueError, KeyError, zipfile.BadZipFile, plistlib.InvalidFileException) as exc:
+                command(["codesign", "--verify", "--check-notarization", "-R", "=notarized", str(app)], root, 60)
+        except (OSError, ValueError, KeyError, RuntimeError, zipfile.BadZipFile, plistlib.InvalidFileException) as exc:
             if isinstance(exc, BuildError):
                 raise
             raise BuildError("built ZIP does not contain the declared macOS app") from None
@@ -158,14 +160,18 @@ def build_bottle(manifest, channel, candidate, digests, tap: str, token: str, ro
     try:
         target.write_text(files[ruby], encoding="utf-8")
         formula = f"{tap}/{token}"
-        command(["brew", "install", "--formula", "--build-bottle", formula], stage)
+        command(["brew", "install", "--formula", "--build-bottle", "--skip-link", formula], stage)
         command(["brew", "bottle", "--json", "--no-rebuild", "--root-url", root_url, formula], stage)
     finally:
         target.write_bytes(original)
     paths = list(stage.glob("*.bottle.json"))
     if len(paths) != 1:
         raise BuildError("Homebrew did not emit a single bottle receipt")
-    path, name, bottle = bottle_from_json(stage, json.loads(paths[0].read_text()), token, candidate.version,
+    try:
+        metadata = json.loads(paths[0].read_text())
+    except (UnicodeError, json.JSONDecodeError):
+        raise BuildError("Homebrew emitted invalid bottle JSON") from None
+    path, name, bottle = bottle_from_json(stage, metadata, token, candidate.version,
                                          manifest.data["build"]["bottle_tag"], root_url)
     destination = stage / name
     path.rename(destination)
@@ -185,10 +191,12 @@ def recipe_hash(manifest) -> str:
     return digest.hexdigest()
 
 
-def build_identity(manifest, channel, candidate, digests=None) -> dict:
+def build_identity(manifest, channel, candidate, digests) -> dict:
     data = manifest.data
     if data["kind"] == "formula":
-        revision = (digests or candidate_digests(candidate))["universal"]
+        revision = digests.get("universal", "")
+        if not SHA256.fullmatch(revision):
+            raise BuildError("the formula source archive checksum is missing")
     else:
         origin = data["upstream"]["repository"]
         commit = read_json(
@@ -200,7 +208,8 @@ def build_identity(manifest, channel, candidate, digests=None) -> dict:
             raise BuildError("could not pin the upstream source revision")
     recipe = recipe_hash(manifest)
     token = data["token"] + ("-pre" if channel == "pre" else "")
-    tag = release_identity(data["kind"], token, channel, candidate.version, revision, recipe)
+    targets = (data["build"]["bottle_tag"],) if data["kind"] == "formula" else tuple(candidate.missing)
+    tag = release_identity(data["kind"], token, channel, candidate.version, revision, recipe, targets)
     return {"tag": tag, "kind": data["kind"], "token": token, "channel": channel, "version": candidate.version,
             "revision": revision, "recipe": recipe}
 
@@ -245,7 +254,13 @@ def check_receipt(receipt: dict, identity: dict, manifest, candidate) -> None:
             raise BuildError("published cask targets do not match the manifest")
 
 
-def read_published(manifest, channel, candidate, repository: str, app: str, digests=None):
+def receipt_digests(upstream_digests: dict, receipt: dict) -> dict:
+    if receipt["kind"] == "formula":
+        return upstream_digests
+    return {**upstream_digests, **{target: receipt["files"][name] for target, name in receipt["targets"].items()}}
+
+
+def read_published(manifest, channel, candidate, repository: str, app: str, digests):
     identity = build_identity(manifest, channel, candidate, digests)
     for release in github_releases(repository):
         if release["tag_name"] != identity["tag"] or release["draft"]:
@@ -260,12 +275,12 @@ def read_published(manifest, channel, candidate, repository: str, app: str, dige
             for name, digest in receipt["files"].items():
                 if checksum_download(public_url(repository, identity["tag"], name)) != digest:
                     raise BuildError("published binary checksum does not match its receipt")
-            return identity, finished
+            return identity, finished, receipt_digests(digests, receipt)
         except (TypeError, ValueError, KeyError) as exc:
             if isinstance(exc, (BuildError, ReleaseError)):
                 raise
             raise BuildError("invalid published build receipt") from None
-    return identity, None
+    return identity, None, digests
 
 
 def stage_build(manifest, channel, candidate, identity: dict, repository: str, tap: str, directory: Path,

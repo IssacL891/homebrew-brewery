@@ -15,13 +15,13 @@ if __package__ in (None, ""):
     sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 from automation.build_artifacts import (
-    BuildError, check_receipt, finish_candidate, public_url, publish_release, recipe_hash, release_identity,
+    BuildError, build_identity, check_receipt, finish_candidate, public_url, publish_release, read_published, receipt_digests,
 )
-from automation.bumps import PackageResult, result_from_json
+from automation.bumps import PackageResult, needs_binary, result_from_json
 from automation.manifests import ManifestError, load_manifest, yaml_parser
 from automation.package_diff import candidate_digests, checksum_download, prepare_bump
 from automation.pr_validation import FULL_SHA, bump_branch, git
-from automation.releases import ReleaseError, version_key
+from automation.releases import Candidate, ReleaseError, github_releases, resolve_releases, version_key
 
 
 class PublishError(ValueError):
@@ -66,8 +66,7 @@ def publish_one(api, base: str, package: PackageResult, current: str, open_prs: 
         ):
             return PublishResult(package.kind, package.token, "skipped", "branch already has a non-app PR")
         number = open_match["number"]
-        if package.build:
-            package = api.publish_build(package)
+        package = api.verify_package(package)
         sha = api.verify_and_refresh(package, base, branch, open_match["head"]["sha"], number)
         api.queue_merge(number, sha)
         return PublishResult(package.kind, package.token, "pending", f"PR #{number} awaiting validation")
@@ -91,8 +90,7 @@ def publish_one(api, base: str, package: PackageResult, current: str, open_prs: 
     current_head = api.get_branch_sha(branch)
     if current_head and not api.owns_initial_commit(current_head):
         raise PublishError("existing branch ownership could not be verified")
-    if package.build:
-        package = api.publish_build(package)
+    package = api.verify_package(package)
     if current_head:
         head = api.verify_and_refresh(package, base, branch, current_head, None)
     else:
@@ -111,7 +109,8 @@ def publish_bumps(api, base: str, packages: list[PackageResult], current_version
             continue
         try:
             results.append(publish_one(api, base, package, current_versions[package.kind, package.token], open_prs))
-        except (PublishError, BuildError, ManifestError, ReleaseError, OSError, subprocess.SubprocessError) as exc:
+        except (PublishError, BuildError, ManifestError, ReleaseError, OSError, subprocess.SubprocessError,
+                KeyError, TypeError) as exc:
             message = str(exc) if isinstance(exc, (PublishError, BuildError)) else "could not verify or publish the candidate"
             results.append(PublishResult(package.kind, package.token, "warning", message))
     return results
@@ -235,30 +234,63 @@ class GitHub:
         self.api(f"{self.path}/releases/{release_id}", method="PATCH", label="could not publish the binary release",
                  data={"draft": False, "make_latest": "false"})
 
+    def manifest_for(self, package: PackageResult):
+        base_token = package.token.removesuffix("-pre") if package.channel == "pre" else package.token
+        directory = "casks" if package.kind == "cask" else "formulae"
+        return load_manifest(self.root / "packages" / directory / f"{base_token}.yaml")
+
+    def expected_candidate(self, manifest, channel: str, proposed: Candidate) -> Candidate:
+        data = manifest.data
+        if "upstream" in data:
+            policy = data["upstream"]
+            found = resolve_releases(
+                github_releases(policy["repository"]), policy, data["channels"][channel]["version"], channel,
+                build_targets=tuple(data.get("build", {}).get("targets", ())),
+            )
+            if found is None or found.version != proposed.version:
+                raise PublishError("the planned bump no longer matches the release policy")
+            return found
+        template = data.get("url", "")
+        if channel != "stable" or "{version}" not in template or "{tag}" in template or version_key(proposed.version).is_prerelease:
+            raise PublishError("invalid conventional release candidate")
+        return Candidate(proposed.version, proposed.version,
+                         {"universal": template.replace("{version}", proposed.version)})
+
+    def verify_package(self, package: PackageResult) -> PackageResult:
+        if package.build:
+            return self.publish_build(package)
+        manifest = self.manifest_for(package)
+        expected = self.expected_candidate(manifest, package.channel, package.candidate)
+        digests = candidate_digests(expected)
+        if needs_binary(manifest, expected):
+            _, expected, digests = read_published(manifest, package.channel, expected, self.repository, self.app_login, digests)
+            if expected is None:
+                raise PublishError("the previously published binary could not be verified")
+        if package.candidate != expected or package.files != prepare_bump(manifest, package.channel, expected, digests):
+            raise PublishError("the scan report does not match the trusted package diff")
+        return package
+
     def publish_build(self, package: PackageResult) -> PackageResult:
         if self.artifacts is None or package.candidate is None or not package.build:
             raise PublishError("no staged binary report")
-        candidate = package.candidate
         receipt = package.build["receipt"]
-        base_token = package.token.removesuffix("-pre") if package.channel == "pre" else package.token
-        directory = "casks" if package.kind == "cask" else "formulae"
-        manifest = load_manifest(self.root / "packages" / directory / f"{base_token}.yaml")
-        digests = package.build["digests"]
-        recipe = recipe_hash(manifest)
-        revision = receipt.get("revision", "")
-        if package.kind == "formula" and revision != digests.get("universal"):
-            raise PublishError("bottle source digest changed before publishing")
-        tag = release_identity(package.kind, package.token, package.channel, candidate.version, revision, recipe)
-        identity = {"tag": tag, "kind": package.kind, "token": package.token, "channel": package.channel,
-                    "version": candidate.version, "revision": revision, "recipe": recipe}
+        manifest = self.manifest_for(package)
+        candidate = self.expected_candidate(manifest, package.channel, package.candidate)
+        if candidate != package.candidate or not needs_binary(manifest, candidate):
+            raise PublishError("staged binary does not match the configured release")
+        digests = candidate_digests(candidate)
+        if digests != package.build["digests"]:
+            raise PublishError("source checksums changed before publishing")
+        identity = build_identity(manifest, package.channel, candidate, digests)
         check_receipt(receipt, identity, manifest, candidate)
+        tag = identity["tag"]
         finished = finish_candidate(candidate, receipt, self.repository)
         root = self.artifacts.resolve()
         files = {name: root / tag / name for name in receipt["files"]}
         if any(path.resolve() != path for path in files.values()):
             raise BuildError("staged binary path crosses a symlink")
         publish_release(self, receipt, files, lambda name: checksum_download(public_url(self.repository, tag, name)))
-        prepared = prepare_bump(manifest, package.channel, finished, candidate_digests(finished))
+        prepared = prepare_bump(manifest, package.channel, finished, receipt_digests(digests, receipt))
         return replace(package, status="candidate", candidate=finished, files=prepared, build=None)
 
     def verify_and_refresh(self, package: PackageResult, base: str, branch: str, head: str, number: int | None) -> str:

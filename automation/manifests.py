@@ -229,6 +229,8 @@ def validate_manifest(manifest: Manifest) -> None:
 
     if "upstream" in data:
         validate_upstream(data["upstream"])
+        if kind == "formula" and set(data["upstream"]["assets"]) != {"universal"}:
+            raise ManifestError("formula upstream policy must declare one universal source archive")
     if "build" in data:
         validate_build(manifest)
 

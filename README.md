@@ -121,3 +121,14 @@ the public download before the PR is opened. If a prior upload is interrupted,
 a matching draft can be reused. An existing asset with different bytes is left
 for review. Existing packages remain on their current release routes until a
 maintainer adds a build configuration.
+
+Keep the original GitHub branch protection, ruleset, workflow settings, and
+legacy workflow states recorded before cutover. To pause publication, unset
+BREWERY_PUBLISH_ENABLED and turn off native auto-merge while inspecting
+queued PRs. Keep the current required check in place during a rollback until
+its replacement has been demonstrated. Restore the previous settings only
+after confirming that open PRs and scheduled workflows are safe to resume.
+
+If GitHub leaves an incomplete upload with no matching checksum, the draft
+can require manual cleanup. The publisher leaves any existing asset with an
+unknown or conflicting digest untouched.

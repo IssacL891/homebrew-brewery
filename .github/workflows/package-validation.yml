@@ -69,6 +69,7 @@ jobs:
             formula="$TAP/${token%%/*}"
             brew untap "$TAP"
             brew tap --custom-remote "$TAP" "$GITHUB_WORKSPACE"
+            brew trust --tap "$TAP"
             brew install --formula --build-from-source "$formula"
             has_test=$(brew ruby -e 'require "formulary"; puts Formulary.factory(ARGV.fetch(0)).test_defined?' "$formula")
             if [[ "$has_test" == true ]]; then

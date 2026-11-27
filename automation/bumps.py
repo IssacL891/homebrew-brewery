@@ -83,11 +83,10 @@ def prepare_package(
     digests = candidate_digests(candidate)
     if needs_binary(manifest, candidate):
         repository = os.environ.get("GITHUB_REPOSITORY", DEFAULT_REPOSITORY)
-        identity, published = read_published(manifest, channel, candidate, repository,
+        identity, published, digests = read_published(manifest, channel, candidate, repository,
                                              os.environ.get("BREWERY_APP_BOT", ""), digests)
         if published:
             candidate = published
-            digests = candidate_digests(candidate)
         elif build_dir is None:
             return PackageResult(kind, token, channel, "build-required", f"{candidate.version} needs a build", candidate)
         else:

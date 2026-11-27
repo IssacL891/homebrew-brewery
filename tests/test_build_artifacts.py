@@ -8,7 +8,7 @@ import unittest
 from unittest.mock import patch
 
 from automation.bumps import scan
-from automation.manifests import load_manifest
+from automation.manifests import ManifestError, load_manifest
 from automation.package_diff import prepare_bump
 from automation.releases import ReleaseError, resolve_releases
 from test_render import DARTOTSU
@@ -29,6 +29,8 @@ class ArtifactTests(unittest.TestCase):
         args = ("cask", "sample", "stable", "2.0", "a" * 40, "b" * 64)
         self.assertNotEqual(release_identity(*args), release_identity(*args[:2], "pre", *args[3:]))
         self.assertNotEqual(release_identity(*args), release_identity(*args[:-1], "c" * 64))
+        self.assertNotEqual(release_identity(*args, ("arm64", "x86_64")),
+                            release_identity(*args, ("x86_64",)))
 
     def test_bottle_names_and_metadata_come_from_homebrew(self):
         with tempfile.TemporaryDirectory() as tmp:
@@ -146,6 +148,11 @@ channels:
   stable:
     version: "1.0"
     sha256: \"""" + "1" * 64 + '"\n')
+            original_manifest = path.read_text()
+            path.write_text(original_manifest + "\nupstream:\n  repository: example/app\n  assets:\n    arm64: source.tar.gz\n")
+            with self.assertRaisesRegex(ManifestError, "universal source archive"):
+                load_manifest(path)
+            path.write_text(original_manifest)
             manifest = load_manifest(path)
             tap = root / "tap"
             installed = tap / "Formula/sample.rb"
@@ -158,6 +165,8 @@ channels:
                 if args[1] == "--repository":
                     return str(tap)
                 self.assertIn('version "2.0"', installed.read_text())
+                if args[1] == "install":
+                    self.assertIn("--skip-link", args)
                 if args[1] == "bottle":
                     file = stage / "sample--2.0.arm64_tahoe.bottle.tar.gz"
                     file.write_bytes(b"fixture bottle")
@@ -180,6 +189,15 @@ channels:
             ):
                 file, bottle = build_bottle(manifest, "stable", candidate, {"universal": "2" * 64},
                                             "fixture/repo", "sample", url, stage)
+            with (
+                patch.dict("os.environ", {"RUNNER_ENVIRONMENT": "github-hosted", "ACT": ""}),
+                patch("automation.build_artifacts.platform.system", return_value="Darwin"),
+                patch("automation.build_artifacts.command", side_effect=brew),
+                patch("automation.build_artifacts.json.loads", side_effect=json.JSONDecodeError("bad", "", 0)),
+            ):
+                with self.assertRaisesRegex(BuildError, "invalid bottle JSON"):
+                    build_bottle(manifest, "stable", candidate, {"universal": "2" * 64},
+                                 "fixture/repo", "sample", url, stage)
             self.assertTrue(file.is_file())
             self.assertEqual(installed.read_text(), "# original formula\n")
             prepared = prepare_bump(manifest, "stable",
@@ -212,7 +230,7 @@ build:
             manifest = load_manifest(path)
             source = "1" * 40
             fingerprint = recipe_hash(manifest)
-            tag = release_identity("cask", "dartotsu", "stable", "2.0", source, fingerprint)
+            tag = release_identity("cask", "dartotsu", "stable", "2.0", source, fingerprint, ("universal",))
             filename = "dartotsu-universal.zip"
             stage = root / "staged" / tag
             stage.mkdir(parents=True)
@@ -227,17 +245,22 @@ build:
             api = GitHub(root, "tester/brewery", "fixture[bot]", root / "staged")
             release = {"id": 10, "draft": True, "body": json.dumps(receipt), "assets": []}
             with (
+                patch.object(api, "expected_candidate", return_value=candidate),
+                patch("automation.build_artifacts.read_json", return_value={"sha": source}),
                 patch.object(api, "release", return_value=release),
                 patch.object(api, "upload") as upload,
                 patch.object(api, "finalize") as finalize,
                 patch("automation.publish.checksum_download", return_value=digest),
-                patch("automation.publish.candidate_digests", return_value={"universal": digest}),
+                patch("automation.publish.candidate_digests", side_effect=[{}]) as upstream_checksums,
             ):
                 published = api.publish_build(package)
+            upstream_checksums.assert_called_once_with(candidate)
             upload.assert_called_once_with(tag, stage / filename)
             finalize.assert_called_once_with(10)
             self.assertIn(f"/{tag}/{filename}", published.files[Path("Casks/Manga Readers/dartotsu.rb")])
             with (
+                patch.object(api, "expected_candidate", return_value=candidate),
+                patch("automation.build_artifacts.read_json", return_value={"sha": source}),
                 patch.object(api, "release", return_value={**release, "draft": False,
                              "assets": [{"name": filename, "digest": f"sha256:{digest}"}]}),
                 patch("automation.publish.checksum_download", return_value="0" * 64),
@@ -246,3 +269,37 @@ build:
                 with self.assertRaisesRegex(BuildError, "public download"):
                     api.publish_build(package)
                 prepare.assert_not_called()
+
+    def test_encrypted_or_unreadable_zip_is_a_package_build_error(self):
+        import zipfile
+        from automation.build_artifacts import inspect_app_zip
+
+        with tempfile.TemporaryDirectory() as temporary:
+            archive = Path(temporary) / "bad.zip"
+            with zipfile.ZipFile(archive, "w") as output:
+                output.writestr("Dartotsu.app/Contents/Info.plist", b"fixture")
+            with patch("zipfile.ZipFile.extract", side_effect=RuntimeError("encrypted file")):
+                with self.assertRaisesRegex(BuildError, "declared macOS app"):
+                    inspect_app_zip(archive, "Dartotsu.app", "arm64", "none")
+
+    def test_notarization_requires_explicit_notary_evidence(self):
+        import plistlib
+        import zipfile
+        from automation.build_artifacts import inspect_app_zip
+
+        with tempfile.TemporaryDirectory() as temporary:
+            archive = Path(temporary) / "sample.zip"
+            with zipfile.ZipFile(archive, "w") as output:
+                output.writestr("Dartotsu.app/Contents/Info.plist", plistlib.dumps({"CFBundleExecutable": "fixture"}))
+                output.writestr("Dartotsu.app/Contents/MacOS/fixture", b"binary")
+
+            def command(arguments, *unused):
+                if arguments[0] == "lipo":
+                    return "arm64"
+                if "=notarized" in arguments:
+                    raise BuildError("no ticket")
+                return ""
+
+            with patch("automation.build_artifacts.command", side_effect=command):
+                with self.assertRaisesRegex(BuildError, "no ticket"):
+                    inspect_app_zip(archive, "Dartotsu.app", "arm64", "notarized")

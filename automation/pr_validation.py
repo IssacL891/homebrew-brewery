@@ -71,13 +71,12 @@ def validate_pr_files(
         raise ManifestError("the current upstream candidate does not match the proposed bump")
     artifacts = candidate_digests(candidate)
     if needs_binary(original, candidate):
-        _, candidate = read_published(
+        _, candidate, artifacts = read_published(
             original, channel, candidate, os.environ.get("GITHUB_REPOSITORY", DEFAULT_REPOSITORY),
             os.environ.get("BREWERY_APP_BOT", ""), artifacts,
         )
         if candidate is None:
             raise ManifestError("an opted-in binary has not been published and verified")
-        artifacts = candidate_digests(candidate)
     files = {path: regular_file(head, path).read_bytes().decode("utf-8") for path in paths}
     validate_diff(original, channel, candidate, artifacts, files)
     return candidate

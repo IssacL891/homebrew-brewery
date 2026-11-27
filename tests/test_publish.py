@@ -41,6 +41,9 @@ class GitHubFixture:
     def find_prs(self, branch):
         return self.by_head
 
+    def verify_package(self, package):
+        return package
+
     def get_branch_sha(self, branch):
         return None
 
@@ -173,3 +176,18 @@ class PublisherTests(unittest.TestCase):
             )
             self.assertIn('version: "1.2.3"', git(remote, "show", f"{sha}:{MANIFEST}"))
             self.assertIn('version: "1.2.3-alpha"', git(remote, "show", f"{sha}:{MANIFEST}"))
+
+    def test_publisher_recreates_the_diff_from_the_trusted_checkout(self):
+        with tempfile.TemporaryDirectory() as scratch:
+            root = Path(scratch).resolve()
+            path = root / MANIFEST
+            path.parent.mkdir(parents=True)
+            path.write_text(DARTOTSU)
+            candidate = Candidate(CANDIDATE.version, CANDIDATE.version, CANDIDATE.urls)
+            valid = prepare_bump(load_manifest(path), "stable", candidate, {"universal": DIGEST})
+            changed = {**valid, Path(".github/workflows/unexpected.yml"): "unexpected"}
+            package = PackageResult("cask", "dartotsu", "stable", "candidate", candidate.version, candidate, changed)
+            api = GitHub(root, "fixture/tap", GitHubFixture.app_login)
+            with patch("automation.publish.candidate_digests", return_value={"universal": DIGEST}):
+                with self.assertRaisesRegex(PublishError, "trusted package diff"):
+                    api.verify_package(package)
