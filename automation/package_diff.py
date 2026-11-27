@@ -1,6 +1,7 @@
 """Prepare and check manifest-only release changes and their generated Ruby."""
 
 from copy import deepcopy
+from contextlib import nullcontext
 import hashlib
 from http.client import HTTPException
 from pathlib import Path
@@ -20,18 +21,20 @@ class HTTPSRedirects(HTTPRedirectHandler):
         return super().redirect_request(req, fp, code, msg, headers, newurl)
 
 
-def checksum_download(url: str) -> str:
+def checksum_download(url: str, *, output: Path | None = None) -> str:
     if urlsplit(url).scheme != "https":
         raise ReleaseError("package download requires HTTPS")
     opener = build_opener(HTTPSRedirects())
     request = Request(url, headers={"User-Agent": "homebrew-brewery/1"})
     digest = hashlib.sha256()
     try:
-        with opener.open(request, timeout=45) as response:
+        with opener.open(request, timeout=45) as response, (output.open("xb") if output else nullcontext()) as stream:
             if response.status != 200 or response.headers.get_content_type() == "text/html":
                 raise ReleaseError("download did not return the expected artifact")
             size = 0
             while chunk := response.read(1024 * 1024):
+                if stream:
+                    stream.write(chunk)
                 digest.update(chunk)
                 size += len(chunk)
             if size == 0:
@@ -47,7 +50,8 @@ def checksum_download(url: str) -> str:
 
 
 def candidate_digests(candidate: Candidate) -> dict[str, str]:
-    return {target: checksum_download(url) for target, url in candidate.urls.items()}
+    digests = {target: checksum_download(url) for target, url in candidate.urls.items()}
+    return digests
 
 
 def prepare_bump(manifest: Manifest, channel: str, candidate: Candidate, digests: dict[str, str]) -> dict[Path, str]:
@@ -60,6 +64,9 @@ def prepare_bump(manifest: Manifest, channel: str, candidate: Candidate, digests
 
     release["version"] = candidate.version
     release["tag"] = candidate.tag
+    release.pop("bottle", None)
+    if candidate.bottle:
+        release["bottle"] = candidate.bottle
     if set(digests) == {"universal"}:
         release.pop("artifacts", None)
         release["sha256"] = digests["universal"]

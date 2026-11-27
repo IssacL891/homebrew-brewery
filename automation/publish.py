@@ -2,7 +2,7 @@
 
 import argparse
 from base64 import b64encode
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 import json
 import os
 from pathlib import Path
@@ -14,9 +14,12 @@ from urllib.parse import quote, urlencode
 if __package__ in (None, ""):
     sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
+from automation.build_artifacts import (
+    BuildError, check_receipt, finish_candidate, public_url, publish_release, recipe_hash, release_identity,
+)
 from automation.bumps import PackageResult, result_from_json
 from automation.manifests import ManifestError, load_manifest, yaml_parser
-from automation.package_diff import prepare_bump
+from automation.package_diff import candidate_digests, checksum_download, prepare_bump
 from automation.pr_validation import FULL_SHA, bump_branch, git
 from automation.releases import ReleaseError, version_key
 
@@ -48,8 +51,8 @@ def pending_version(pull: dict, package: PackageResult) -> str | None:
 
 def publish_one(api, base: str, package: PackageResult, current: str, open_prs: list[dict]) -> PublishResult:
     candidate = package.candidate
-    if candidate is None or not package.files:
-        raise PublishError("release candidate has no verified package diff")
+    if candidate is None or (not package.files and not package.build):
+        raise PublishError("release candidate has no verified package diff or build")
     title = f"{package.token} {candidate.version}"
     branch = bump_branch(package.kind, package.token, candidate.version)
     existing = api.find_prs(branch)
@@ -63,6 +66,8 @@ def publish_one(api, base: str, package: PackageResult, current: str, open_prs: 
         ):
             return PublishResult(package.kind, package.token, "skipped", "branch already has a non-app PR")
         number = open_match["number"]
+        if package.build:
+            package = api.publish_build(package)
         sha = api.verify_and_refresh(package, base, branch, open_match["head"]["sha"], number)
         api.queue_merge(number, sha)
         return PublishResult(package.kind, package.token, "pending", f"PR #{number} awaiting validation")
@@ -84,9 +89,11 @@ def publish_one(api, base: str, package: PackageResult, current: str, open_prs: 
             return PublishResult(package.kind, package.token, "skipped", f"pending candidate in PR #{pr['number']}")
 
     current_head = api.get_branch_sha(branch)
+    if current_head and not api.owns_initial_commit(current_head):
+        raise PublishError("existing branch ownership could not be verified")
+    if package.build:
+        package = api.publish_build(package)
     if current_head:
-        if not api.owns_initial_commit(current_head):
-            raise PublishError("existing branch ownership could not be verified")
         head = api.verify_and_refresh(package, base, branch, current_head, None)
     else:
         head = api.create_commit(branch, base, title, package.files)
@@ -99,13 +106,13 @@ def publish_bumps(api, base: str, packages: list[PackageResult], current_version
     open_prs = api.list_open()
     results = []
     for package in packages:
-        if package.status != "candidate":
+        if package.status not in ("candidate", "built"):
             results.append(PublishResult(package.kind, package.token, package.status, package.message, "scan"))
             continue
         try:
             results.append(publish_one(api, base, package, current_versions[package.kind, package.token], open_prs))
-        except (PublishError, ManifestError, ReleaseError, OSError, subprocess.SubprocessError) as exc:
-            message = str(exc) if isinstance(exc, PublishError) else "could not verify or publish the candidate"
+        except (PublishError, BuildError, ManifestError, ReleaseError, OSError, subprocess.SubprocessError) as exc:
+            message = str(exc) if isinstance(exc, (PublishError, BuildError)) else "could not verify or publish the candidate"
             results.append(PublishResult(package.kind, package.token, "warning", message))
     return results
 
@@ -120,12 +127,13 @@ mutation($input: CreateCommitOnBranchInput!) {
 class GitHub:
     default_branch = "main"
 
-    def __init__(self, root: Path, repository: str, app_login: str):
+    def __init__(self, root: Path, repository: str, app_login: str, artifacts: Path | None = None):
         self.root = root
         self.repository = repository
         self.app_login = app_login
         self.owner = repository.split("/", 1)[0]
         self.path = f"repos/{repository}"
+        self.artifacts = artifacts
 
     def command(self, args: list[str], *, label: str, data=None, parse=True):
         try:
@@ -198,6 +206,60 @@ class GitHub:
              "--match-head-commit", expected_head],
             label=f"could not request auto-merge for PR #{number}", parse=False,
         )
+
+    def release(self, tag: str) -> dict | None:
+        pages = self.api(f"{self.path}/releases?per_page=100", label="could not read binary releases", paginate=True)
+        releases = [item for page in pages for item in page if item.get("tag_name") == tag]
+        if len(releases) > 1:
+            raise PublishError("more than one release uses the requested build tag")
+        if not releases:
+            return None
+        release = releases[0]
+        if (release.get("author") or {}).get("login") != self.app_login:
+            raise PublishError("existing binary release has an unexpected author")
+        return release
+
+    def create_release(self, receipt: dict) -> dict:
+        return self.api(f"{self.path}/releases", label="could not create draft binary release", method="POST", data={
+            "tag_name": receipt["tag"], "target_commitish": git(self.root, "rev-parse", "HEAD").strip(),
+            "name": f"Brewery build: {receipt['token']} {receipt['version']}",
+            "body": json.dumps(receipt, sort_keys=True), "draft": True,
+            "prerelease": receipt["channel"] == "pre", "make_latest": "false",
+        })
+
+    def upload(self, tag: str, path: Path) -> None:
+        self.command(["release", "upload", tag, str(path), "--repo", self.repository],
+                     label="could not upload the binary to its draft release", parse=False)
+
+    def finalize(self, release_id: int) -> None:
+        self.api(f"{self.path}/releases/{release_id}", method="PATCH", label="could not publish the binary release",
+                 data={"draft": False, "make_latest": "false"})
+
+    def publish_build(self, package: PackageResult) -> PackageResult:
+        if self.artifacts is None or package.candidate is None or not package.build:
+            raise PublishError("no staged binary report")
+        candidate = package.candidate
+        receipt = package.build["receipt"]
+        base_token = package.token.removesuffix("-pre") if package.channel == "pre" else package.token
+        directory = "casks" if package.kind == "cask" else "formulae"
+        manifest = load_manifest(self.root / "packages" / directory / f"{base_token}.yaml")
+        digests = package.build["digests"]
+        recipe = recipe_hash(manifest)
+        revision = receipt.get("revision", "")
+        if package.kind == "formula" and revision != digests.get("universal"):
+            raise PublishError("bottle source digest changed before publishing")
+        tag = release_identity(package.kind, package.token, package.channel, candidate.version, revision, recipe)
+        identity = {"tag": tag, "kind": package.kind, "token": package.token, "channel": package.channel,
+                    "version": candidate.version, "revision": revision, "recipe": recipe}
+        check_receipt(receipt, identity, manifest, candidate)
+        finished = finish_candidate(candidate, receipt, self.repository)
+        root = self.artifacts.resolve()
+        files = {name: root / tag / name for name in receipt["files"]}
+        if any(path.resolve() != path for path in files.values()):
+            raise BuildError("staged binary path crosses a symlink")
+        publish_release(self, receipt, files, lambda name: checksum_download(public_url(self.repository, tag, name)))
+        prepared = prepare_bump(manifest, package.channel, finished, candidate_digests(finished))
+        return replace(package, status="candidate", candidate=finished, files=prepared, build=None)
 
     def verify_and_refresh(self, package: PackageResult, base: str, branch: str, head: str, number: int | None) -> str:
         origin = f"https://github.com/{self.repository}.git"
@@ -273,7 +335,7 @@ def main() -> int:
         report = json.loads(args.report.read_text())
         base = report["base_sha"]
         repository = os.environ["GITHUB_REPOSITORY"]
-        app = GitHub(root, repository, os.environ["BREWERY_APP_BOT"])
+        app = GitHub(root, repository, os.environ["BREWERY_APP_BOT"], args.report.parent / "binaries")
         if not FULL_SHA.fullmatch(base) or git(root, "rev-parse", "HEAD").strip() != base:
             raise PublishError("the publishing checkout does not match the scan")
         if app.get_branch_sha(app.default_branch) != base:

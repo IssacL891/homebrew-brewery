@@ -1,6 +1,6 @@
 """Select newer releases and verify that the expected published assets exist."""
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from functools import cache
 from itertools import groupby
 import json
@@ -21,6 +21,8 @@ class Candidate:
     version: str
     tag: str
     urls: dict[str, str]
+    missing: list[str] = field(default_factory=list)
+    bottle: dict | None = None
 
 
 def version_key(value: str) -> Version:
@@ -63,7 +65,8 @@ def pick_assets(release: dict, policy: dict, version: str) -> tuple[dict[str, st
     return urls, missing
 
 
-def resolve_releases(releases: list[dict], policy: dict, current_version: str, channel: str) -> Candidate | None:
+def resolve_releases(releases: list[dict], policy: dict, current_version: str, channel: str,
+                     *, build_targets: tuple[str, ...] = ()) -> Candidate | None:
     current = version_key(current_version)
     prefix = policy.get("tag_prefix", "")
     tag_pattern = policy.get("tag_pattern")
@@ -86,8 +89,8 @@ def resolve_releases(releases: list[dict], policy: dict, current_version: str, c
         if next(group, None) is not None:
             raise ReleaseError("ambiguous tags for the same package version")
         urls, missing = pick_assets(release, policy, version)
-        if not missing:
-            return Candidate(version, release["tag_name"], urls)
+        if not missing or set(missing) <= set(build_targets):
+            return Candidate(version, release["tag_name"], urls, missing)
         missing_for = ", ".join(missing)
         if not policy.get("fallback"):
             break

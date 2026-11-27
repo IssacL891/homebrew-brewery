@@ -47,13 +47,18 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
           PACKAGE: ${{ inputs.package }}
+          BREWERY_APP_BOT: ${{ vars.BREWERY_APP_BOT }}
+          STAGE_BINARIES: ${{ github.ref == 'refs/heads/main' && vars.BREWERY_PUBLISH_ENABLED == 'true' && (github.event_name == 'schedule' || inputs.publish) }}
           TAP: ${{ github.repository_owner }}/brewery
         run: |
           python -m pip install -r automation/requirements.txt
           python automation/render.py --check
           brew tap --custom-remote "$TAP" "$GITHUB_WORKSPACE"
           brew trust --tap "$TAP"
-          args=(--dry-run --tap "$TAP" --result-file "$RUNNER_TEMP/brewery-scan.json")
+          scan_dir="$RUNNER_TEMP/brewery-scan"
+          mkdir -p "$scan_dir"
+          args=(--dry-run --tap "$TAP" --result-file "$scan_dir/brewery-scan.json")
+          if [[ "$STAGE_BINARIES" == true ]]; then args+=(--build-dir "$scan_dir/binaries"); fi
           if [[ -n "$PACKAGE" ]]; then args+=(--package "$PACKAGE"); fi
           python automation/bumps.py scan "${args[@]}"
 
@@ -62,7 +67,7 @@ jobs:
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:
           name: brewery-scan
-          path: ${{ runner.temp }}/brewery-scan.json
+          path: ${{ runner.temp }}/brewery-scan/
           retention-days: 3
 
       - name: Exercise release and publishing fixtures on the local runner
@@ -131,6 +136,15 @@ jobs:
           path: ${{ runner.temp }}/brewery-publish.json
           retention-days: 3
 
+      - name: Exercise the local publishing and build fixtures
+        if: ${{ env.ACT }}
+        working-directory: ${{ vars.BREWERY_FIXTURE_ROOT }}
+        env:
+          FIXTURE_PYTHON: ${{ vars.BREWERY_FIXTURE_PYTHON }}
+        run: |
+          "${FIXTURE_PYTHON:-python3}" -m unittest discover -s tests -p 'test_publish.py' -v
+          "${FIXTURE_PYTHON:-python3}" -m unittest discover -s tests -p 'test_build_artifacts.py' -v
+
   report:
     needs: [scan, publish]
     if: ${{ always() && github.ref == 'refs/heads/main' && github.event_name == 'schedule' && vars.BREWERY_ISSUE_NUMBER != '' && vars.BREWERY_APP_CLIENT_ID != '' }}
@@ -187,3 +201,10 @@ jobs:
         run: |
           python automation/notifications.py --scan "$RUNNER_TEMP/brewery/brewery-scan.json" \
             --publish "$RUNNER_TEMP/brewery/brewery-publish.json"
+
+      - name: Exercise local issue transitions
+        if: ${{ env.ACT }}
+        working-directory: ${{ vars.BREWERY_FIXTURE_ROOT }}
+        env:
+          FIXTURE_PYTHON: ${{ vars.BREWERY_FIXTURE_PYTHON }}
+        run: "\"${FIXTURE_PYTHON:-python3}\" -m unittest discover -s tests -p 'test_notifications.py' -v"

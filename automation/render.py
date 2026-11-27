@@ -93,6 +93,14 @@ def render_formula(manifest: Manifest, token: str, release: dict, sibling: str |
     if "license" in data:
         lines.append(f"  license {ruby_string(data['license'])}")
     lines.extend(livecheck_stanzas(data))
+    if "bottle" in release:
+        bottle = release["bottle"]
+        lines.extend(["", "  bottle do", f"    root_url {ruby_string(bottle['root_url'])}"])
+        for target, entry in sorted(bottle["tags"].items()):
+            cellar = entry["cellar"]
+            rendered_cellar = ruby_string(cellar) if cellar.startswith("/") else f":{cellar}"
+            lines.append(f"    sha256 cellar: {rendered_cellar}, {target}: {ruby_string(entry['sha256'])}")
+        lines.append("  end")
     if sibling:
         lines.extend(["", f"  conflicts_with {ruby_string(sibling)}, because: \"both install the same package\""])
     dependencies = data.get("depends_on", [])

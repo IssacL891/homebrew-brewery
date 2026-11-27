@@ -43,3 +43,42 @@ class NotificationsTests(unittest.TestCase):
         self.assertIn("yaagl-gi", text)
         self.assertIn(run, text)
         self.assertIn("Cleared", text)
+
+    def test_three_reports_post_only_initial_failure_and_recovery(self):
+        import json
+        from pathlib import Path
+        import tempfile
+        from unittest.mock import patch
+
+        from automation.notifications import main
+
+        with tempfile.TemporaryDirectory() as temporary:
+            scan = Path(temporary) / "scan.json"
+            publish = Path(temporary) / "publish.json"
+            comments = []
+
+            def api(endpoint, *, label, data=None, **unused):
+                if data is None:
+                    return [list(comments)]
+                comments.append({"user": {"login": APP}, "body": data["body"]})
+                return {}
+
+            context = {
+                "BREWERY_ISSUE_NUMBER": "5", "GITHUB_REPOSITORY": "IssacL891/homebrew-brewery",
+                "BREWERY_APP_BOT": APP, "GITHUB_RUN_ID": "10", "SCAN_STATUS": "success",
+                "PUBLISH_STATUS": "skipped",
+            }
+            with (
+                patch.dict("os.environ", context),
+                patch("sys.argv", ["notifications.py", "--scan", str(scan), "--publish", str(publish)]),
+                patch("automation.notifications.GitHub.api", side_effect=api),
+            ):
+                for status in ("warning", "warning", "current"):
+                    scan.write_text(json.dumps({"packages": [{
+                        "kind": "cask", "token": "dartotsu", "status": status,
+                        "message": "missing release asset for universal",
+                    }]}))
+                    self.assertEqual(main(), 0)
+            self.assertEqual(len(comments), 2)
+            self.assertIn("Needs attention", comments[0]["body"])
+            self.assertIn("Cleared", comments[1]["body"])

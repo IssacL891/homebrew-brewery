@@ -31,8 +31,9 @@ class Manifest:
 TOKEN = re.compile(r"[a-z0-9]+(?:-[a-z0-9]+)*\Z")
 VERSION = re.compile(r"[a-zA-Z0-9][a-zA-Z0-9.+,_-]*\Z")
 SHA256 = re.compile(r"[a-f0-9]{64}\Z")
+BOTTLE_TAG = re.compile(r"(?:arm64_)?[a-z][a-z0-9_]*\Z")
 PLACEHOLDER = re.compile(r"\{([^{}]*)\}")
-COMMON_KEYS = {"schema", "kind", "token", "directory", "desc", "homepage", "url", "channels", "livecheck", "upstream"}
+COMMON_KEYS = {"schema", "kind", "token", "directory", "desc", "homepage", "url", "channels", "livecheck", "upstream", "build"}
 CASK_KEYS = {"name", "macos", "arch", "app", "zap"}
 FORMULA_KEYS = {"recipe", "patch", "license", "depends_on"}
 MANIFEST_DIRS = {"cask": "casks", "formula": "formulae"}
@@ -93,13 +94,17 @@ def validate_sha256(value, field: str) -> None:
         raise ManifestError(f"{field} is invalid")
 
 
-def validate_release(release, channel: str, fallback_url: str | None, kind: str, arch: str | None) -> None:
-    validate_mapping(release, {"version", "sha256", "tag", "url", "artifacts"}, channel)
+def validate_release(release, channel: str, fallback_url: str | None, kind: str, arch: str | None, schema: int) -> None:
+    validate_mapping(release, {"version", "sha256", "tag", "url", "artifacts", "bottle"}, channel)
     version = release.get("version")
     if not isinstance(version, str) or not VERSION.fullmatch(version):
         raise ManifestError(f"{channel}.version is invalid")
     if "tag" in release and (not isinstance(release["tag"], str) or not VERSION.fullmatch(release["tag"])):
         raise ManifestError(f"{channel}.tag is invalid")
+    if "bottle" in release:
+        if schema != 2 or kind != "formula":
+            raise ManifestError("bottles require schema 2 formulae")
+        validate_bottle(release["bottle"])
     if "artifacts" in release:
         if kind != "cask" or "url" in release or "sha256" in release:
             raise ManifestError(f"{channel}.artifacts is only for architecture-specific cask downloads")
@@ -150,10 +155,55 @@ def validate_upstream(policy) -> None:
             raise ManifestError(f"invalid upstream.tag_pattern: {exc}") from exc
 
 
+def validate_bottle(bottle) -> None:
+    validate_mapping(bottle, {"root_url", "tags"}, "bottle")
+    validate_url(bottle.get("root_url"), "bottle.root_url")
+    tags = bottle.get("tags")
+    if not isinstance(tags, dict) or not tags:
+        raise ManifestError("bottle.tags must contain at least one Homebrew target")
+    for target, entry in tags.items():
+        if not isinstance(target, str) or not BOTTLE_TAG.fullmatch(target):
+            raise ManifestError("invalid Homebrew bottle target")
+        validate_mapping(entry, {"cellar", "sha256"}, "bottle tag")
+        if entry.get("cellar") not in ("any", "any_skip_relocation", "/opt/homebrew/Cellar", "/usr/local/Cellar"):
+            raise ManifestError("invalid Homebrew bottle cellar")
+        validate_sha256(entry.get("sha256"), "bottle.sha256")
+
+
+def validate_build(manifest: Manifest) -> None:
+    data = manifest.data
+    build = data["build"]
+    if data["schema"] != 2:
+        raise ManifestError("build recipes require manifest schema 2")
+    if data["kind"] == "formula":
+        validate_mapping(build, {"bottle_tag"}, "build")
+        if not isinstance(build.get("bottle_tag"), str) or not BOTTLE_TAG.fullmatch(build["bottle_tag"]):
+            raise ManifestError("build.bottle_tag must be a Homebrew target")
+        return
+
+    validate_mapping(build, {"script", "targets", "signing"}, "build")
+    script = build.get("script")
+    validate_relative_path(script, "build.script")
+    if not script.endswith(".sh"):
+        raise ManifestError("build.script must name a reviewed shell recipe")
+    manifest.resolve_recipe(script)
+    targets = build.get("targets")
+    validate_string_list(targets, "build.targets")
+    if not targets or len(targets) != len(set(targets)) or not set(targets) <= set(data.get("upstream", {}).get("assets", {})):
+        raise ManifestError("build.targets must name distinct configured upstream targets")
+    assets = set(data["upstream"]["assets"])
+    arch = data.get("arch")
+    expected = {arch} if arch else {"arm64", "x86_64"}
+    if assets != expected and not (assets == {"universal"} and not arch):
+        raise ManifestError("binary fallback assets must cover the declared cask architectures")
+    if build.get("signing", "none") not in ("none", "signed", "notarized"):
+        raise ManifestError("build.signing must be none, signed or notarized")
+
+
 def validate_manifest(manifest: Manifest) -> None:
     data = manifest.data
-    if not isinstance(data, dict) or type(data.get("schema")) is not int or data["schema"] != 1:
-        raise ManifestError("expected package manifest schema 1")
+    if not isinstance(data, dict) or type(data.get("schema")) is not int or data["schema"] not in (1, 2):
+        raise ManifestError("expected package manifest schema 1 or 2")
     kind = data.get("kind")
     if kind not in ("cask", "formula"):
         raise ManifestError("kind must be cask or formula")
@@ -175,10 +225,12 @@ def validate_manifest(manifest: Manifest) -> None:
     if "stable" not in channels:
         raise ManifestError("channels.stable is required")
     for channel, release in channels.items():
-        validate_release(release, channel, data.get("url"), kind, data.get("arch"))
+        validate_release(release, channel, data.get("url"), kind, data.get("arch"), data["schema"])
 
     if "upstream" in data:
         validate_upstream(data["upstream"])
+    if "build" in data:
+        validate_build(manifest)
 
     if "livecheck" in data:
         livecheck = data["livecheck"]

@@ -17,6 +17,7 @@ ISSUE_KEY = re.compile(r"(?:(?:cask|formula):[a-z0-9-]+:(?:scan|publish)|workflo
 STATE_LINE = re.compile(r"^<!-- brewery-state-v1:(.+) -->$", re.M)
 REASONS = {
     "asset_missing": "Expected upstream asset is missing.",
+    "build_failed": "Could not build or verify the configured fallback binary.",
     "download_failed": "Could not verify the package download.",
     "discovery_failed": "Could not identify a usable upstream release.",
     "publication_failed": "Could not publish or queue the bump.",
@@ -73,6 +74,8 @@ def read_issue_state(comments: list[dict], app_login: str) -> dict:
 
 
 def scan_reason(message: str) -> str:
+    if message.startswith("binary build:"):
+        return "build_failed"
     if message.startswith("missing release asset"):
         return "asset_missing"
     if message.startswith(("download", "package download")):

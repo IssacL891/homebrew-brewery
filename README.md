@@ -82,3 +82,42 @@ To receive alerts, configure BREWERY_ISSUE_NUMBER for one tracking issue and
 subscribe to it. The reporter uses an issues-only token and posts only when the
 recorded problems change. GitHub delivers those updates using your notification
 settings.
+
+### Opt in to publishing missing binaries
+
+Use manifest schema 2 and add a build section only for packages whose
+binaries Brewery should publish. For a cask, keep the expected upstream
+asset names under upstream.assets. For example, an arm64-only cask with
+arch set to arm64 can use:
+
+    schema: 2
+    upstream:
+      repository: example/project
+      assets:
+        arm64: Example-arm64.zip
+    build:
+      script: recipes/build-example.sh
+      targets: [arm64]
+      signing: none
+
+The reviewed script receives three arguments: the source tarball pinned to the
+upstream release commit, the output ZIP path, and the requested architecture.
+The ZIP must contain the app bundle named in the cask. The scanner checks the
+Mach-O slices and can require signature verification or notarization with
+signing set to signed or notarized. A name mismatch, unavailable architecture,
+or build failure leaves that package unchanged. If all expected upstream
+downloads exist, the script is skipped.
+
+For a YAML-managed source formula, use schema 2 and set build.bottle_tag to
+the Homebrew tag of the targeted macOS builder, such as arm64_tahoe. CI uses
+the formula's reviewed recipe and Homebrew's bottle output for that one target.
+Installs on other targets can still build from source. A new target requires
+a matching runner. The local act path compiles a tiny app fixture and mocks
+the Homebrew bottle commands to avoid installing packages on the host.
+
+Binary releases carry a receipt for the exact source, recipe, channel, target,
+and checksum. They are staged separately from the bump PR and verified from
+the public download before the PR is opened. If a prior upload is interrupted,
+a matching draft can be reused. An existing asset with different bytes is left
+for review. Existing packages remain on their current release routes until a
+maintainer adds a build configuration.

@@ -12,7 +12,8 @@ from urllib.parse import quote
 if __package__ in (None, ""):
     sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
-from automation.bumps import find_candidate
+from automation.build_artifacts import BuildError, read_published
+from automation.bumps import DEFAULT_REPOSITORY, find_candidate, needs_binary
 from automation.manifests import ManifestError, load_manifest
 from automation.package_diff import candidate_digests, validate_diff
 from automation.releases import Candidate, ReleaseError
@@ -69,6 +70,14 @@ def validate_pr_files(
     if candidate is None or candidate.version != proposed_channels[channel]["version"]:
         raise ManifestError("the current upstream candidate does not match the proposed bump")
     artifacts = candidate_digests(candidate)
+    if needs_binary(original, candidate):
+        _, candidate = read_published(
+            original, channel, candidate, os.environ.get("GITHUB_REPOSITORY", DEFAULT_REPOSITORY),
+            os.environ.get("BREWERY_APP_BOT", ""), artifacts,
+        )
+        if candidate is None:
+            raise ManifestError("an opted-in binary has not been published and verified")
+        artifacts = candidate_digests(candidate)
     files = {path: regular_file(head, path).read_bytes().decode("utf-8") for path in paths}
     validate_diff(original, channel, candidate, artifacts, files)
     return candidate
@@ -123,7 +132,7 @@ def main() -> int:
     args = parser.parse_args()
     try:
         candidate = validate_git_pr(args.root, args.base, args.head, args.branch)
-    except (ManifestError, ReleaseError, subprocess.SubprocessError, OSError, UnicodeError) as exc:
+    except (ManifestError, ReleaseError, BuildError, subprocess.SubprocessError, OSError, UnicodeError) as exc:
         print(f"PR validation failed: {exc}", file=sys.stderr)
         return 1
     print(f"Verified the generated bump for {candidate.version}.")
