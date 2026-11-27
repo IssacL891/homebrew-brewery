@@ -161,3 +161,16 @@ class NotificationsTests(unittest.TestCase):
             response.headers["X-T3-Hook-Outcome"] = "filtered"
             with self.assertRaises(OSError):
                 notifications.dispatch_to_t3("https://example.com/receiver", "shared", REPO, 17)
+
+    def test_t3_connect_relay_receipt_has_delivery_id_without_outcome_header(self):
+        response = Mock(status=202, headers={})
+        response.__enter__ = Mock(return_value=response)
+        response.__exit__ = Mock(return_value=False)
+        response.read.return_value = b'{"deliveryId":"relay-delivery-17"}'
+        opener = Mock()
+        opener.open.return_value = response
+        with patch.object(notifications, "build_opener", return_value=opener):
+            notifications.dispatch_to_t3("https://example.com/receiver", "shared", REPO, 17)
+            response.read.return_value = b'{"status":"unexpected"}'
+            with self.assertRaises(OSError):
+                notifications.dispatch_to_t3("https://example.com/receiver", "shared", REPO, 17)

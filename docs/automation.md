@@ -73,11 +73,10 @@ settings, or close the issue. If a repository fix is unavailable, explain
 the blocker in the thread and leave the issue open.
 ```
 
-T3 receives only the repository and issue number. The reporter records a
-receipt after T3 accepts the delivery or recognizes it as a duplicate. A
-transport error leaves the issue open for a retry on a later scan. A receipt
-confirms delivery, so check the T3 task's **Deliveries** view if the run fails to
-start or the thread produces no PR. A fix for an upstream or transient failure
+T3 receives only the repository and issue number. The public relay returns a
+delivery ID. Check the T3 task's **Deliveries** view for the outcome if a run
+fails to start or the thread produces no PR. A transport error leaves the
+issue open for a retry on a later scan. A fix for an upstream or transient failure
 may be unavailable. Pause the T3 task to suspend automatic repair threads.
 
 ## Cutover and rollback

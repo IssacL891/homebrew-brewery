@@ -104,8 +104,15 @@ def dispatch_to_t3(url: str, secret: str, repository: str, number: int) -> None:
     })
     with build_opener(NoRedirect()).open(request, timeout=20) as response:
         outcome = response.headers.get("X-T3-Hook-Outcome")
-        if response.status != 202 or outcome not in {"accepted", "duplicate"}:
-            raise OSError("T3 did not accept the repair request")
+        if response.status == 202:
+            if outcome in {"accepted", "duplicate"}:
+                return
+            if outcome is None:
+                # T3 Connect keeps the JSON delivery ID and strips the outcome header.
+                receipt = json.loads(response.read(4096))
+                if isinstance(receipt, dict) and isinstance(receipt.get("deliveryId"), str) and receipt["deliveryId"]:
+                    return
+        raise OSError("T3 did not accept the repair request")
 
 
 def scan_reason(message: str) -> str:
